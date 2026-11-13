@@ -7,7 +7,7 @@
   <% if (!user.readiness.ready) { %><p class="notice notice-info">Je profiel is nog niet zichtbaar voor anderen. <a href="/start">Bekijk wat er nog nodig is</a>.</p><% } %>
 
   <h2>Video</h2>
-  <p class="muted">Je video is het belangrijkste deel van je profiel. Toegestaan: mp4, mov of webm.</p>
+  <p class="muted">Je video is het belangrijkste deel van je profiel. Toegestaan: mp4, mov of webm, maximaal 100 MB (ongeveer 30 seconden).</p>
   <% if (user.video_key) { %>
     <video class="profile-video" src="/media/video/<%= user.id %>" controls playsinline preload="metadata"></video>
     <form method="post" action="/profiel/video/verwijderen" class="inline" data-confirm="Video verwijderen? Zonder video ben je niet zichtbaar.">
@@ -20,7 +20,7 @@
   <form method="post" action="/profiel/video" enctype="multipart/form-data" class="form upload-form">
     <input type="hidden" name="_csrf" value="<%= csrfToken %>">
     <label><%= user.video_key ? 'Nieuwe video uploaden' : 'Video uploaden' %>
-  <input type="file" name="video" accept="video/*" required>
+      <input type="file" name="video" accept="video/*" required>
     </label>
     <progress class="upload-progress" max="100" value="0" hidden></progress>
     <button class="btn btn-primary" type="submit">Uploaden</button>
@@ -98,6 +98,23 @@
         <label>Tot en met <input type="number" name="pref_age_max" min="18" max="99" value="<%= user.pref_age_max || '' %>" placeholder="geen"></label>
       </div>
       <small>Leeg laten = geen voorkeur. Voorkeuren werken twee kanten op: je ziet alleen mensen bij wie jij ook binnen hun voorkeuren valt.</small>
+    </fieldset>
+
+    <fieldset>
+      <legend>📍 Waar woon je?</legend>
+      <label>Buurt in Amsterdam
+        <select name="neighborhood">
+          <option value="">Kies je buurt</option>
+          <% for (const n of neighborhoods) { %><option value="<%= n.key %>" <%= user.neighborhood === n.key ? 'selected' : '' %>><%= n.name %></option><% } %>
+        </select>
+      </label>
+      <label>Maximaal hoe ver weg mag je match wonen?
+        <select name="max_distance_km">
+          <option value="">Maakt niet uit</option>
+          <% for (const km of [2, 3, 5, 8, 10, 15, 25]) { %><option value="<%= km %>" <%= Number(user.max_distance_km) === km ? 'selected' : '' %>><%= km %> km</option><% } %>
+        </select>
+      </label>
+      <small>We slaan alleen je buurt op, geen adres. Dit werkt twee kanten op: je ziet alleen mensen die binnen jouw afstand wonen én bij wie jij binnen hún afstand valt. Heb je geen buurt gekozen, dan tellen we de afstand niet mee.</small>
     </fieldset>
     <button class="btn btn-primary" type="submit">Opslaan</button>
   </form>

@@ -1,7 +1,7 @@
 'use strict';
 const { tx } = require('../db');
 const { generateSlots, formatTime, formatLongDate } = require('../lib/time');
-const { pickBestSlot, normalizeChoices, ValidationError } = require('../lib/scheduling');
+const { pickBestSlot, suggestSlot, normalizeChoices, ValidationError } = require('../lib/scheduling');
 const { chooseVenue } = require('./venues');
 
 class DateError extends Error {
@@ -13,6 +13,7 @@ class DateError extends Error {
 
 const PLANNING = ['collecting', 'no_overlap', 'proposed'];
 const DELAY_OPTIONS = [5, 10, 15, 20, 30, 45, 60];
+const MAX_SUGGESTIONS = 2; // zoveel tijdvoorstellen doet de app zelf voordat mensen zelf nieuwe tijden kiezen
 
 function createDates({ pool, config, notifier }) {
   const minutes = (n) => n * 60000;
@@ -186,7 +187,14 @@ function createDates({ pool, config, notifier }) {
       if (plan.status === 'no_overlap' || plan.status === 'proposed') {
         // Start a new round: everybody chooses again. Old confirmations no longer apply
         // because a new proposal always gets a new proposal_version.
-        await setStatus(c, plan, 'collecting', { round: plan.round + 1, proposed_start: null, venue_id: null });
+        await setStatus(c, plan, 'collecting', {
+          round: plan.round + 1,
+          proposed_start: null,
+          venue_id: null,
+          suggested: false,
+          suggest_count: 0,
+          rejected_slots: [],
+        });
       }
       await c.query('DELETE FROM time_choices WHERE plan_id=$1 AND user_id=$2 AND round=$3', [plan.id, userId, plan.round]);
       for (const ch of choices) {
@@ -215,8 +223,8 @@ function createDates({ pool, config, notifier }) {
       if (!otherSub.rowCount) {
         await notify(c, plan.otherId, {
           type: 'times_submitted',
-          title: `${myName} heeft tijden gekozen`,
-          body: 'Kies jouw voorkeurstijden voor vandaag om een datevoorstel te krijgen.',
+          title: `⏰ ${myName} heeft tijden gekozen`,
+          body: 'Nu jij nog! Kies je tijden voor vandaag, dan staat de date zo vast 🎉',
           link,
         });
         return { outcome: 'waiting' };
@@ -228,42 +236,157 @@ function createDates({ pool, config, notifier }) {
       const theirs = rows.filter((r) => r.user_id === plan.otherId).map((r) => ({ slotStart: r.slot_start, rank: r.rank }));
       const minStart = new Date(now.getTime() + minutes(config.slotMinLeadMinutes) - 1);
       const best = pickBestSlot(mine, theirs, { now: minStart });
-      if (!best) {
-        await setStatus(c, plan, 'no_overlap');
-        await event(c, plan, null, 'no_overlap', { round: plan.round });
+
+      if (best) {
+        const venue = await chooseVenue(c, best.slotStart);
+        if (venue) {
+          // Allebei dezelfde tijd gekozen: meteen definitief, niemand hoeft nog iets te accepteren.
+          await setStatus(c, plan, 'confirmed', {
+            proposed_start: best.slotStart,
+            venue_id: venue.id,
+            proposal_version: plan.proposal_version + 1,
+            suggested: false,
+            confirmed_at: now,
+          });
+          for (const uid of [userId, plan.otherId]) {
+            await c.query(
+              `INSERT INTO date_confirmations (plan_id, user_id, proposal_version, confirmed_start, confirmed_venue_id)
+               VALUES ($1,$2,$3,$4,$5) ON CONFLICT DO NOTHING`,
+              [plan.id, uid, plan.proposal_version, best.slotStart, venue.id]
+            );
+          }
+          await event(c, plan, null, 'confirmed', { auto: true, start: best.slotStart, venueId: venue.id, score: best.score });
+          const when = `${formatLongDate(best.slotStart)} om ${formatTime(best.slotStart)}`;
+          for (const uid of [userId, plan.otherId]) {
+            await notify(c, uid, {
+              type: 'confirmed',
+              title: '🎉 Jullie date staat!',
+              body: `${when} bij ${venue.name}. Zin in! 🥂 Kan het toch niet? Je kunt altijd annuleren in de app.`,
+              link,
+            });
+          }
+          return { outcome: 'confirmed', start: best.slotStart, venue };
+        }
+        // Wel overlap, maar nog geen open locatie: voorstel zonder locatie (bevestigen kan zodra er een is).
+        await setStatus(c, plan, 'proposed', {
+          proposed_start: best.slotStart,
+          venue_id: null,
+          proposal_version: plan.proposal_version + 1,
+          suggested: false,
+        });
+        await event(c, plan, null, 'proposed', { start: best.slotStart, venueId: null, score: best.score });
+        const when = `${formatLongDate(best.slotStart)} om ${formatTime(best.slotStart)}`;
         for (const uid of [userId, plan.otherId]) {
           await notify(c, uid, {
-            type: 'no_overlap',
-            title: 'Geen gezamenlijke tijd gevonden',
-            body: 'Jullie gekozen tijden overlappen niet. Kies andere tijden om toch vandaag af te spreken.',
+            type: 'proposed',
+            title: '✨ Jullie hebben een gezamenlijke tijd!',
+            body: `${when}. Er is alleen nog geen locatie beschikbaar; die komt er zo aan 🍸`,
             link,
           });
         }
-        return { outcome: 'no_overlap' };
+        return { outcome: 'proposed', start: best.slotStart, venue: null };
       }
-      const venue = await chooseVenue(c, best.slotStart);
-      await setStatus(c, plan, 'proposed', {
-        proposed_start: best.slotStart,
-        venue_id: venue ? venue.id : null,
-        proposal_version: plan.proposal_version + 1,
-      });
-      await event(c, plan, null, 'proposed', { start: best.slotStart, venueId: venue ? venue.id : null, score: best.score });
-      const when = `${formatLongDate(best.slotStart)} om ${formatTime(best.slotStart)}`;
+
+      // Geen overlap: de app doet zelf een voorstel dat zo dicht mogelijk bij beide wensen ligt.
+      const suggestion = await makeSuggestion(c, plan, notify, now, { firstOne: true });
+      if (suggestion) return { outcome: 'suggested', start: suggestion.start, venue: suggestion.venue };
+
+      await setStatus(c, plan, 'no_overlap');
+      await event(c, plan, null, 'no_overlap', { round: plan.round });
       for (const uid of [userId, plan.otherId]) {
         await notify(c, uid, {
-          type: 'proposed',
-          title: 'Er is een datevoorstel',
-          body: venue
-            ? `Voorstel: ${when} bij ${venue.name}. Bevestig het voorstel in de app.`
-            : `Gezamenlijke tijd: ${when}. Er is nog geen locatie beschikbaar.`,
+          type: 'no_overlap',
+          title: '🙈 Net niet op dezelfde tijd',
+          body: 'Jullie tijden en een open bar of koffieplek kwamen net niet samen. Kies nog een paar andere tijden, dan lukt het vast alsnog! 💪',
           link,
         });
       }
-      return { outcome: 'proposed', start: best.slotStart, venue };
+      return { outcome: 'no_overlap' };
     });
   }
 
-  async function confirm(matchId, userId, { acceptTerms, proposalVersion }, now = new Date()) {
+  /**
+   * Geen gezamenlijke tijd: stel de beschikbare tijd voor die het dichtst bij beide wensen ligt
+   * (en waar een open locatie is). Geeft null als er niets te vinden is.
+   */
+  async function makeSuggestion(c, plan, notify, now, { firstOne = false, declinedBy = null } = {}) {
+    if (plan.suggest_count >= MAX_SUGGESTIONS) return null;
+    const rows = (
+      await c.query('SELECT user_id, slot_start, rank FROM time_choices WHERE plan_id=$1 AND round=$2', [plan.id, plan.round])
+    ).rows;
+    const a = rows.filter((r) => r.user_id === plan.user_a).map((r) => ({ slotStart: r.slot_start }));
+    const b = rows.filter((r) => r.user_id === plan.user_b).map((r) => ({ slotStart: r.slot_start }));
+    const minStart = now.getTime() + minutes(config.slotMinLeadMinutes) - 1;
+    const allowed = generateSlots(plan.day, config, now).filter((d) => d.getTime() > minStart);
+    const exclude = [...(plan.rejected_slots || [])];
+    let pick = null;
+    let venue = null;
+    for (let i = 0; i < allowed.length + 1; i++) {
+      const cand = suggestSlot(a, b, allowed, { exclude });
+      if (!cand) break;
+      const v = await chooseVenue(c, cand.slotStart);
+      if (v) {
+        pick = cand;
+        venue = v;
+        break;
+      }
+      exclude.push(cand.slotStart);
+    }
+    if (!pick) return null;
+
+    await setStatus(c, plan, 'proposed', {
+      proposed_start: pick.slotStart,
+      venue_id: venue.id,
+      proposal_version: plan.proposal_version + 1,
+      suggested: true,
+      suggest_count: plan.suggest_count + 1,
+    });
+    await event(c, plan, null, 'suggested', { start: pick.slotStart, venueId: venue.id, gapA: pick.gapA, gapB: pick.gapB });
+    const when = `${formatLongDate(pick.slotStart)} om ${formatTime(pick.slotStart)}`;
+    const intro = firstOne
+      ? 'Jullie tijden vielen net naast elkaar 🙈 Daarom stelt Vandaag zelf iets voor:'
+      : 'Geen probleem, hier is een ander voorstel:';
+    for (const uid of [plan.user_a, plan.user_b]) {
+      await notify(c, uid, {
+        type: 'proposed',
+        title: '💡 Vandaag heeft een voorstel voor jullie',
+        body: `${intro} ${when} bij ${venue.name}. Past dat? Tik op “Ja, past!” in de app ✅`,
+        link: `/matches/${plan.match_id}`,
+      });
+    }
+    return { start: pick.slotStart, venue };
+  }
+
+  /** "Past niet": de app komt met een ander voorstel (max. twee keer), daarna kiezen jullie zelf. */
+  async function declineProposal(matchId, userId, now = new Date()) {
+    return run(async (c, notify) => {
+      const plan = await lockPlan(c, matchId, userId);
+      await refresh(c, plan, now);
+      if (plan.status !== 'proposed' || !plan.suggested) {
+        throw new DateError('NOT_PROPOSED', 'Er is geen voorstel van de app om af te wijzen.');
+      }
+      const name = await nameOf(c, userId);
+      plan.rejected_slots = [...(plan.rejected_slots || []), plan.proposed_start];
+      await c.query('UPDATE date_plans SET rejected_slots = $2 WHERE id = $1', [plan.id, plan.rejected_slots]);
+      await event(c, plan, userId, 'suggestion_declined', { start: plan.proposed_start });
+      const next = await makeSuggestion(c, plan, notify, now, { declinedBy: userId });
+      if (next) return { outcome: 'new_suggestion', start: next.start, venue: next.venue, otherId: plan.otherId };
+
+      await setStatus(c, plan, 'no_overlap', { suggested: false });
+      await event(c, plan, null, 'no_overlap', { round: plan.round, afterSuggestions: true });
+      for (const uid of [userId, plan.otherId]) {
+        await notify(c, uid, {
+          type: 'no_overlap',
+          title: '🙈 Nog geen tijd die voor allebei past',
+          body: `${uid === userId ? 'Kies' : `${name} en jij kiezen`} nog even zelf een paar andere tijden, dan lukt het vast alsnog! 💪`,
+          link: `/matches/${matchId}`,
+        });
+      }
+      return { outcome: 'no_overlap', otherId: plan.otherId };
+    });
+  }
+
+  async function confirm(matchId, userId, { proposalVersion }, now = new Date()) {
     return run(async (c, notify) => {
       const plan = await lockPlan(c, matchId, userId);
       await refresh(c, plan, now);
@@ -273,7 +396,6 @@ function createDates({ pool, config, notifier }) {
       if (Number(proposalVersion) !== plan.proposal_version) {
         throw new DateError('STALE', 'Het voorstel is intussen gewijzigd. Bekijk het nieuwe voorstel en bevestig opnieuw.');
       }
-      if (!acceptTerms) throw new DateError('TERMS', 'Je moet de no-showvoorwaarden accepteren om te bevestigen.');
 
       const ins = await c.query(
         `INSERT INTO date_confirmations (plan_id, user_id, proposal_version, confirmed_start, confirmed_venue_id,
@@ -297,8 +419,8 @@ function createDates({ pool, config, notifier }) {
         for (const uid of [userId, plan.otherId]) {
           await notify(c, uid, {
             type: 'confirmed',
-            title: 'Jullie date is definitief',
-            body: `Vandaag om ${formatTime(plan.proposed_start)}. Bekijk de locatie in de app.`,
+            title: '🎉 Jullie date staat!',
+            body: `Vandaag om ${formatTime(plan.proposed_start)}. Bekijk de locatie in de app. Zin in! 🥂`,
             link,
           });
         }
@@ -306,8 +428,8 @@ function createDates({ pool, config, notifier }) {
       }
       await notify(c, plan.otherId, {
         type: 'confirmed_by_other',
-        title: `${myName} heeft het datevoorstel bevestigd`,
-        body: 'Bevestig jij ook? Pas dan is de date definitief.',
+        title: `✅ ${myName} zegt ja!`,
+        body: 'Past het voor jou ook? Tik op “Ja, past!” en de date staat.',
         link,
       });
       return { outcome: 'waiting_other' };
@@ -331,8 +453,8 @@ function createDates({ pool, config, notifier }) {
       const name = await nameOf(c, userId);
       await notify(c, plan.otherId, {
         type: 'delayed',
-        title: `${name} is vertraagd`,
-        body: `${name} verwacht ongeveer ${m} minuten later te zijn.`,
+        title: `🏃 ${name} is iets later`,
+        body: `${name} verwacht ongeveer ${m} minuten later te zijn. Even geduld, het wordt gezellig! 😊`,
         link: `/matches/${matchId}`,
       });
       return { outcome: 'delayed', otherId: plan.otherId };
@@ -355,8 +477,8 @@ function createDates({ pool, config, notifier }) {
       const name = await nameOf(c, userId);
       await notify(c, plan.otherId, {
         type: 'cancelled',
-        title: wasConfirmed ? `${name} heeft de date geannuleerd` : `${name} heeft het plannen gestopt`,
-        body: wasConfirmed ? 'De afspraak van vandaag gaat niet door.' : 'Er komt vandaag geen date met deze match.',
+        title: wasConfirmed ? '😕 Helaas, je date heeft geannuleerd' : '😕 Deze date gaat helaas niet door',
+        body: 'Maar niet getreurd: er komt snel een nieuwe match jouw kant op! 💫 Blijf swipen, de volgende kan de ware zijn.',
         link: `/matches/${matchId}`,
       });
       return { outcome: 'cancelled', otherId: plan.otherId };
@@ -378,9 +500,9 @@ function createDates({ pool, config, notifier }) {
       if (wasConfirmed) {
         await notify(c, blockedId, {
           type: 'cancelled',
-          title: 'Je date is geannuleerd',
-          body: 'De afspraak van vandaag gaat niet door.',
-          link: '/matches',
+          title: '😕 Helaas, je date gaat niet door',
+          body: 'Maar niet getreurd: er komt snel een nieuwe match jouw kant op! 💫 Blijf swipen.',
+          link: '/ontdekken',
         });
       }
     }
@@ -406,8 +528,8 @@ function createDates({ pool, config, notifier }) {
       // Neutral message on purpose: the other user is not told why.
       await notify(c, plan.otherId, {
         type: 'ended',
-        title: `${name} heeft de date beëindigd`,
-        body: 'De afspraak van vandaag gaat niet (verder) door.',
+        title: '😕 Je date is beëindigd',
+        body: 'De afspraak van vandaag gaat niet (verder) door. Niet getreurd, er wacht vast iemand leuks! 💫 Blijf swipen.',
         link: `/matches/${matchId}`,
       });
       if (doReport) {
@@ -445,7 +567,7 @@ function createDates({ pool, config, notifier }) {
       await event(c, plan, userId, 'noshow_reported', { reportId: ins.rows[0].id });
       await notify(c, plan.otherId, {
         type: 'noshow_reported',
-        title: 'Er is een no-show over jou gemeld',
+        title: '⚠️ Er is een no-show over jou gemeld',
         body: `Je match meldt dat je niet bent gekomen. Klopt dat niet? Je kunt binnen ${config.noShowDisputeDays} dagen bezwaar maken in de app. Er wordt niets geïnd zolang de melding niet is beoordeeld.`,
         link: `/no-shows/${ins.rows[0].id}`,
       });
@@ -471,7 +593,7 @@ function createDates({ pool, config, notifier }) {
       if (r.reporter_id) {
         await notify(c, r.reporter_id, {
           type: 'noshow_disputed',
-          title: 'Bezwaar tegen je no-showmelding',
+          title: '📩 Bezwaar tegen je no-showmelding',
           body: 'Je match heeft bezwaar gemaakt. De beheerder beoordeelt de melding.',
           link: `/no-shows/${reportId}`,
         });
@@ -480,7 +602,7 @@ function createDates({ pool, config, notifier }) {
     });
   }
 
-  return { view, submitChoices, confirm, delay, cancel, endUnsafe, block, reportNoShow, disputeNoShow, run, DELAY_OPTIONS };
+  return { view, submitChoices, confirm, declineProposal, delay, cancel, endUnsafe, block, reportNoShow, disputeNoShow, run, DELAY_OPTIONS };
 }
 
 module.exports = { createDates, DateError, ValidationError };

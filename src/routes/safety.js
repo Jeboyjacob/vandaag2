@@ -47,7 +47,7 @@ module.exports = (ctx) => {
         [req.user.id, target.id, kind, reason, String(req.body.details || '').slice(0, 2000)]
       );
       if (req.body.also_block === 'yes') await dates.block(req.user.id, target.id);
-      req.flash('success', `Je melding is ontvangen en wordt door de beheerder bekeken.${req.body.also_block === 'yes' ? ' Je hebt deze persoon ook geblokkeerd.' : ''}`);
+      req.flash('success', `Bedankt dat je het meldt 🙏 De beheerder bekijkt het.${req.body.also_block === 'yes' ? ' Je hebt deze persoon ook geblokkeerd.' : ''} Veel swipe-plezier verder!`);
       res.redirect(req.body.also_block === 'yes' ? '/ontdekken' : '/');
     } catch (err) {
       next(err);
@@ -59,7 +59,7 @@ module.exports = (ctx) => {
       const target = await loadTarget(req, res);
       if (!target) return res.status(404).render('error', { title: 'Niet gevonden', message: 'Gebruiker niet gevonden.' });
       await dates.block(req.user.id, target.id);
-      req.flash('success', `${target.display_name} is geblokkeerd. Jullie zien elkaar niet meer.`);
+      req.flash('success', `${target.display_name} is geblokkeerd. Jullie zien elkaar niet meer. Op naar de volgende match 💫`);
       res.redirect('/matches');
     } catch (err) {
       if (err instanceof DateError) {

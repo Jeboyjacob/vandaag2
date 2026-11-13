@@ -1,9 +1,10 @@
 <%- include('../partials/head') %>
 <section class="card">
-  <h1>Matches</h1>
-  <% const label = { collecting: 'Tijden kiezen', no_overlap: 'Geen gezamenlijke tijd — kies opnieuw', proposed: 'Voorstel — bevestigen', confirmed: 'Date definitief', cancelled: 'Geannuleerd', ended_unsafe: 'Beëindigd', expired: 'Verlopen' }; %>
+  <h1>Matches 💘</h1>
+  <% const label = { collecting: '⏰ Tijden kiezen', no_overlap: '🙈 Kies nieuwe tijden', proposed: '💡 Voorstel: past het?', confirmed: '🎉 Date staat', cancelled: 'Geannuleerd', ended_unsafe: 'Beëindigd', expired: 'Verlopen' }; %>
   <% if (!matches.length) { %>
-    <p>Je hebt nog geen matches. <a href="/ontdekken">Ga swipen</a>.</p>
+    <p>Nog geen matches, maar dat komt snel! 🔥 Hoe meer je swipet, hoe groter de kans.</p>
+    <p><a class="btn btn-primary" href="/ontdekken">Ga swipen</a></p>
   <% } else { %>
     <ul class="list">
       <% for (const m of matches) { %>
@@ -18,6 +19,7 @@
         </li>
       <% } %>
     </ul>
+    <p class="center"><a class="btn btn-ghost" href="/ontdekken">Meer swipen 🔥</a></p>
   <% } %>
 </section>
 <%- include('../partials/foot') %>

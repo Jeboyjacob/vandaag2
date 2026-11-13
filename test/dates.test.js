@@ -34,9 +34,6 @@ async function confirmedDate() {
   const p = await matchedPair();
   await d().submitChoices(p.matchId, p.a.id, [choice('19:00', 1)], MORNING);
   await d().submitChoices(p.matchId, p.b.id, [choice('19:00', 1)], MORNING);
-  const v = (await plan(p.matchId)).proposal_version;
-  await d().confirm(p.matchId, p.a.id, { acceptTerms: true, proposalVersion: v }, MORNING);
-  await d().confirm(p.matchId, p.b.id, { acceptTerms: true, proposalVersion: v }, MORNING);
   assert.equal((await plan(p.matchId)).status, 'confirmed');
   return p;
 }
@@ -48,30 +45,57 @@ test('overlap: best combined rank is proposed, ties go to the earliest time', as
   assert.equal(r1.outcome, 'waiting');
   assert.equal((await plan(matchId)).status, 'collecting');
   const r2 = await d().submitChoices(matchId, b.id, [choice('19:00', 1), choice('21:00', 2), choice('20:00', 3)], MORNING);
-  assert.equal(r2.outcome, 'proposed');
+  assert.equal(r2.outcome, 'confirmed');
   const p = await plan(matchId);
-  assert.equal(p.status, 'proposed');
+  assert.equal(p.status, 'confirmed');
   // 21:00 = 1+2 = 3, 19:00 = 2+1 = 3 -> tie -> earliest (19:00)
   assert.equal(formatTime(p.proposed_start), '19:00');
   assert.ok(p.venue_id);
 });
 
-test('no overlap: explained, then users can choose other times', async () => {
+test('no overlap: the app suggests the nearest time, both tap "ja, past!"', async () => {
   await createVenue(env.pool);
   const { a, b, matchId } = await matchedPair();
   await d().submitChoices(matchId, a.id, [choice('19:00', 1)], MORNING);
   const r = await d().submitChoices(matchId, b.id, [choice('20:00', 1)], MORNING);
-  assert.equal(r.outcome, 'no_overlap');
-  assert.equal((await plan(matchId)).status, 'no_overlap');
-  const n = (await env.pool.query(`SELECT count(*)::int n FROM notifications WHERE type='no_overlap'`)).rows[0].n;
+  assert.equal(r.outcome, 'suggested');
+  const p = await plan(matchId);
+  assert.equal(p.status, 'proposed');
+  assert.equal(p.suggested, true);
+  assert.equal(formatTime(p.proposed_start), '19:30'); // precies tussen de twee keuzes in
+  assert.ok(p.venue_id);
+  const n = (await env.pool.query(`SELECT count(*)::int n FROM notifications WHERE type='proposed'`)).rows[0].n;
   assert.equal(n, 2);
-  // new round
+  const v = p.proposal_version;
+  assert.equal((await d().confirm(matchId, a.id, { proposalVersion: v }, MORNING)).outcome, 'waiting_other');
+  assert.equal((await d().confirm(matchId, b.id, { proposalVersion: v }, MORNING)).outcome, 'confirmed');
+  assert.equal((await plan(matchId)).status, 'confirmed');
+});
+
+test('suggestion declined: second suggestion differs, then people choose themselves', async () => {
+  await createVenue(env.pool);
+  const { a, b, matchId } = await matchedPair();
+  await d().submitChoices(matchId, a.id, [choice('19:00', 1)], MORNING);
+  await d().submitChoices(matchId, b.id, [choice('21:00', 1)], MORNING);
+  const first = formatTime((await plan(matchId)).proposed_start);
+  const r1 = await d().declineProposal(matchId, a.id, MORNING);
+  assert.equal(r1.outcome, 'new_suggestion');
+  const p2 = await plan(matchId);
+  assert.notEqual(formatTime(p2.proposed_start), first);
+  assert.equal(p2.suggest_count, 2);
+  const r2 = await d().declineProposal(matchId, b.id, MORNING);
+  assert.equal(r2.outcome, 'no_overlap');
+  assert.equal((await plan(matchId)).status, 'no_overlap');
+  // pick own times again -> new round
   await d().submitChoices(matchId, a.id, [choice('20:00', 1)], MORNING);
-  const p1 = await plan(matchId);
-  assert.equal(p1.status, 'collecting');
-  assert.equal(p1.round, 2);
-  const r2 = await d().submitChoices(matchId, b.id, [choice('20:00', 1)], MORNING);
-  assert.equal(r2.outcome, 'proposed');
+  assert.equal((await plan(matchId)).round, 2);
+  const r3 = await d().submitChoices(matchId, b.id, [choice('20:00', 1)], MORNING);
+  assert.equal(r3.outcome, 'confirmed');
+});
+
+test('declining is only possible for app suggestions', async () => {
+  const { matchId, a } = await confirmedDate();
+  await assert.rejects(d().declineProposal(matchId, a.id, MORNING), /geen voorstel/);
 });
 
 test('only future slots can be chosen', async () => {
@@ -100,7 +124,7 @@ test('without real venues there is no location and confirming is impossible', as
   const p = await plan(matchId);
   assert.equal(p.status, 'proposed');
   assert.equal(p.venue_id, null);
-  await assert.rejects(d().confirm(matchId, a.id, { acceptTerms: true, proposalVersion: p.proposal_version }, MORNING), /geen locatie/);
+  await assert.rejects(d().confirm(matchId, a.id, { proposalVersion: p.proposal_version }, MORNING), /geen locatie/);
   // When the admin adds a venue, the proposal gets it on the next view.
   await createVenue(env.pool);
   const view = await d().view(matchId, a.id, MORNING);
@@ -115,54 +139,56 @@ test('venue must be open at the proposed time', async () => {
   assert.equal((await plan(matchId)).venue_id, null);
 });
 
-test('double confirmation: one confirm is not enough, both make it definitive', async () => {
+test('suggested proposal: one tap is not enough, both make it definitive', async () => {
   await createVenue(env.pool);
   const { a, b, matchId } = await matchedPair();
   await d().submitChoices(matchId, a.id, [choice('19:00', 1)], MORNING);
-  await d().submitChoices(matchId, b.id, [choice('19:00', 1)], MORNING);
+  await d().submitChoices(matchId, b.id, [choice('20:00', 1)], MORNING);
   const v = (await plan(matchId)).proposal_version;
-
-  await assert.rejects(d().confirm(matchId, a.id, { acceptTerms: false, proposalVersion: v }, MORNING), /no-showvoorwaarden/);
-  const r1 = await d().confirm(matchId, a.id, { acceptTerms: true, proposalVersion: v }, MORNING);
+  const r1 = await d().confirm(matchId, a.id, { proposalVersion: v }, MORNING);
   assert.equal(r1.outcome, 'waiting_other');
   assert.equal((await plan(matchId)).status, 'proposed');
-  const again = await d().confirm(matchId, a.id, { acceptTerms: true, proposalVersion: v }, MORNING);
-  assert.equal(again.outcome, 'duplicate');
-  const r2 = await d().confirm(matchId, b.id, { acceptTerms: true, proposalVersion: v }, MORNING);
-  assert.equal(r2.outcome, 'confirmed');
+  assert.equal((await d().confirm(matchId, a.id, { proposalVersion: v }, MORNING)).outcome, 'duplicate');
+  assert.equal((await d().confirm(matchId, b.id, { proposalVersion: v }, MORNING)).outcome, 'confirmed');
   const confs = (await env.pool.query('SELECT * FROM date_confirmations WHERE plan_id=$1', [(await plan(matchId)).id])).rows;
   assert.equal(confs.length, 2);
-  for (const c of confs) {
-    assert.equal(c.noshow_fee_cents, 750);
-    assert.equal(c.terms_version, 'noshow-v1');
-    assert.ok(c.terms_accepted_at);
-  }
+});
+
+test('automatic confirmation: same time picked means definitive without any tap', async () => {
+  await createVenue(env.pool);
+  const { a, b, matchId } = await matchedPair();
+  await d().submitChoices(matchId, a.id, [choice('19:00', 1)], MORNING);
+  const r = await d().submitChoices(matchId, b.id, [choice('19:00', 1)], MORNING);
+  assert.equal(r.outcome, 'confirmed');
+  assert.ok(r.venue);
+  const confs = (await env.pool.query('SELECT * FROM date_confirmations')).rows;
+  assert.equal(confs.length, 2);
+  const notes = (await env.pool.query(`SELECT * FROM notifications WHERE type='confirmed'`)).rows;
+  assert.equal(notes.length, 2);
 });
 
 test('confirming a stale proposal is refused (time or location changed)', async () => {
   await createVenue(env.pool);
   const { a, b, matchId } = await matchedPair();
-  await d().submitChoices(matchId, a.id, [choice('19:00', 1), choice('20:00', 2)], MORNING);
-  await d().submitChoices(matchId, b.id, [choice('19:00', 1), choice('20:00', 2)], MORNING);
-  const v1 = (await plan(matchId)).proposal_version;
-  await d().confirm(matchId, a.id, { acceptTerms: true, proposalVersion: v1 }, MORNING);
-  // b asks for a different time -> new round, new proposal
+  await d().submitChoices(matchId, a.id, [choice('19:00', 1)], MORNING);
   await d().submitChoices(matchId, b.id, [choice('20:00', 1)], MORNING);
-  await d().submitChoices(matchId, a.id, [choice('20:00', 1)], MORNING);
+  const v1 = (await plan(matchId)).proposal_version;
+  await d().confirm(matchId, a.id, { proposalVersion: v1 }, MORNING);
+  await d().declineProposal(matchId, b.id, MORNING);
   const p = await plan(matchId);
   assert.ok(p.proposal_version > v1);
-  await assert.rejects(d().confirm(matchId, b.id, { acceptTerms: true, proposalVersion: v1 }, MORNING), /gewijzigd/);
-  // a's old confirmation does not count for the new proposal
-  const r = await d().confirm(matchId, b.id, { acceptTerms: true, proposalVersion: p.proposal_version }, MORNING);
-  assert.equal(r.outcome, 'waiting_other');
+  await assert.rejects(d().confirm(matchId, b.id, { proposalVersion: v1 }, MORNING), /gewijzigd/);
+  const r = await d().confirm(matchId, b.id, { proposalVersion: p.proposal_version }, MORNING);
+  assert.equal(r.outcome, 'waiting_other'); // a's old confirmation does not count for the new proposal
 });
 
 test('proposal expires when its start time passes unconfirmed', async () => {
   await createVenue(env.pool);
   const { a, b, matchId } = await matchedPair();
   await d().submitChoices(matchId, a.id, [choice('19:00', 1)], MORNING);
-  await d().submitChoices(matchId, b.id, [choice('19:00', 1)], MORNING);
-  await d().view(matchId, a.id, at('19:05'));
+  await d().submitChoices(matchId, b.id, [choice('19:30', 1)], MORNING);
+  assert.equal((await plan(matchId)).status, 'proposed');
+  await d().view(matchId, a.id, at('23:00'));
   assert.equal((await plan(matchId)).status, 'expired');
 });
 
@@ -283,4 +309,32 @@ test('match page renders for both users and 404s for strangers', async () => {
   const stranger = await loginAgent(env.app, await createUser(env.pool));
   assert.equal((await stranger.get(`/matches/${matchId}`)).status, 404);
   assert.equal((await (await loginAgent(env.app, b)).get('/matches')).status, 200);
+});
+
+test('match page renders for suggestion, confirmed, cancelled; profile page shows location fields', async () => {
+  await createVenue(env.pool);
+  const { a, b, matchId } = await matchedPair();
+  await env.pool.query(`UPDATE date_plans SET day = (now() AT TIME ZONE 'Europe/Amsterdam')::date + 1 WHERE match_id=$1`, [matchId]);
+  const day = (await plan(matchId)).day;
+  const dayStr = day instanceof Date ? day.toLocaleDateString('sv-SE') : String(day).slice(0, 10);
+  const mk = (hhmm, rank) => ({ slot: amsterdamToUtc(dayStr, hhmm).toISOString(), rank });
+  const now = new Date();
+  await d().submitChoices(matchId, a.id, [mk('19:00', 1)], now);
+  const r = await d().submitChoices(matchId, b.id, [mk('21:00', 1)], now);
+  assert.equal(r.outcome, 'suggested');
+  const aa = await loginAgent(env.app, a);
+  let page = await aa.get(`/matches/${matchId}`);
+  assert.equal(page.status, 200);
+  assert.match(page.text, /Ja, past!/);
+  assert.match(page.text, /Past niet/);
+  const v = (await plan(matchId)).proposal_version;
+  await d().confirm(matchId, a.id, { proposalVersion: v });
+  await d().confirm(matchId, b.id, { proposalVersion: v });
+  page = await aa.get(`/matches/${matchId}`);
+  assert.match(page.text, /Jullie date staat/);
+  await d().cancel(matchId, b.id);
+  page = await aa.get(`/matches/${matchId}`);
+  assert.match(page.text, /niet getreurd/);
+  const prof = await aa.get('/profiel');
+  assert.match(prof.text, /Buurt in Amsterdam/);
 });

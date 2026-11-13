@@ -199,3 +199,26 @@ test('reporting a profile creates a report for the admin', async () => {
   assert.equal(rep.reported_user_id, b.id);
   assert.equal((await env.pool.query('SELECT count(*)::int n FROM blocks')).rows[0].n, 1);
 });
+
+test('distance: mutual neighbourhood + km filter', async () => {
+  const me = await createUser(env.pool, { name: 'Ik' });
+  const near = await createUser(env.pool, { name: 'Dichtbij' });
+  const far = await createUser(env.pool, { name: 'Ver' });
+  await env.pool.query(`UPDATE users SET neighborhood='centrum', max_distance_km=3 WHERE id=$1`, [me.id]);
+  await env.pool.query(`UPDATE users SET neighborhood='jordaan' WHERE id=$1`, [near.id]);
+  await env.pool.query(`UPDATE users SET neighborhood='zuidoost' WHERE id=$1`, [far.id]);
+  const seen = new Set();
+  for (let i = 0; i < 3; i++) {
+    const p = await env.ctx.matching.nextProfile(me.id);
+    if (!p) break;
+    seen.add(p.display_name);
+    await env.ctx.matching.swipe(me.id, p.id, 'left');
+  }
+  assert.deepEqual([...seen], ['Dichtbij']);
+  // the far user only accepts people within 2 km: mutual, so "near" is hidden from them too
+  await env.pool.query(`UPDATE users SET max_distance_km=2 WHERE id=$1`, [far.id]);
+  assert.equal(await env.ctx.matching.nextProfile(far.id), null);
+  // no neighbourhood set => distance ignored
+  await env.pool.query(`UPDATE users SET neighborhood=NULL WHERE id=$1`, [far.id]);
+  assert.ok(await env.ctx.matching.nextProfile(far.id));
+});

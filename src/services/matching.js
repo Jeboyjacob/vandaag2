@@ -20,7 +20,11 @@ function deckConditions(devMode) {
     AND (me.pref_age_min IS NULL OR ${AGE_SQL('u')} >= me.pref_age_min)
     AND (me.pref_age_max IS NULL OR ${AGE_SQL('u')} <= me.pref_age_max)
     AND (u.pref_age_min IS NULL OR ${AGE_SQL('me')} >= u.pref_age_min)
-    AND (u.pref_age_max IS NULL OR ${AGE_SQL('me')} <= u.pref_age_max)`;
+    AND (u.pref_age_max IS NULL OR ${AGE_SQL('me')} <= u.pref_age_max)
+    AND (me.max_distance_km IS NULL OR me.neighborhood IS NULL OR u.neighborhood IS NULL
+         OR neighborhood_km(me.neighborhood, u.neighborhood) <= me.max_distance_km)
+    AND (u.max_distance_km IS NULL OR me.neighborhood IS NULL OR u.neighborhood IS NULL
+         OR neighborhood_km(me.neighborhood, u.neighborhood) <= u.max_distance_km)`;
 }
 
 function createMatching({ pool, config, notifier }) {
@@ -89,8 +93,8 @@ function createMatching({ pool, config, notifier }) {
             uid,
             {
               type: 'match',
-              title: 'Je hebt een match!',
-              body: 'Kies de tijden waarop je vandaag kunt afspreken.',
+              title: '💘 Het is een match!',
+              body: 'Kies de tijden waarop je vandaag kunt afspreken. Dat doe je in een minuutje ⏰',
               link: `/matches/${matchId}`,
             },
             c

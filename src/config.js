@@ -54,7 +54,7 @@ function loadConfig(env = process.env) {
     sessionSecret: env.SESSION_SECRET || '',
     trustProxy: env.TRUST_PROXY || '',
     uploadDir: env.UPLOAD_DIR || './data/uploads',
-videoMaxMb: int(env.VIDEO_MAX_MB, 100),
+    videoMaxMb: int(env.VIDEO_MAX_MB, 100),
     rateLimitDisabled: nodeEnv === 'test' && bool(env.RATE_LIMIT_DISABLED),
 
     smtp: {

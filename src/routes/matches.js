@@ -70,9 +70,14 @@ module.exports = (ctx) => {
         if (k.startsWith('rank_') && v !== '') raw.push({ slot: k.slice(5), rank: v });
       }
       const result = await dates.submitChoices(matchId(req), req.user.id, raw);
-      if (result.outcome === 'waiting') req.flash('success', 'Je tijden zijn opgeslagen. We wachten op je match.');
-      if (result.outcome === 'no_overlap') req.flash('warning', 'Jullie tijden overlappen niet. Kies andere tijden.');
-      if (result.outcome === 'proposed') req.flash('success', 'Er is een gezamenlijke tijd gevonden!');
+      const msg = {
+        waiting: 'Top, je tijden staan erin ✅ Zodra je match ook kiest, hoor je het meteen. Swipe intussen lekker verder 🔥',
+        confirmed: '🎉 Jullie hadden dezelfde tijd gekozen, dus de date staat! Zin in!',
+        proposed: '✨ Jullie hebben een gezamenlijke tijd. De locatie volgt zo.',
+        suggested: '💡 Jullie tijden vielen net naast elkaar, dus Vandaag heeft een voorstel gedaan. Past het? Tik op “Ja, past!”.',
+        no_overlap: '🙈 Net niet op dezelfde tijd gelukt. Kies nog een paar andere tijden, dan komt het goed!',
+      }[result.outcome];
+      if (msg) req.flash(['no_overlap'].includes(result.outcome) ? 'warning' : 'success', msg);
       return result;
     })
   );
@@ -82,16 +87,30 @@ module.exports = (ctx) => {
     requireAuth,
     action(async (req) => {
       const result = await dates.confirm(matchId(req), req.user.id, {
-        acceptTerms: req.body.accept_noshow_terms === 'yes',
         proposalVersion: req.body.proposal_version,
       });
       const msg = {
-        confirmed: 'Jullie date is definitief!',
-        waiting_other: 'Je hebt bevestigd. De date is definitief zodra je match ook bevestigt.',
-        duplicate: 'Je had dit voorstel al bevestigd.',
-        already_confirmed: 'Deze date was al definitief.',
+        confirmed: '🎉 Jullie date staat! Zin in!',
+        waiting_other: '✅ Top! Zodra je match ook ja zegt, staat de date. Swipe intussen lekker verder 🔥',
+        duplicate: 'Je had al ja gezegd 😊',
+        already_confirmed: 'Deze date staat al 🎉',
       }[result.outcome];
       req.flash('success', msg);
+      return result;
+    })
+  );
+
+  r.post(
+    '/matches/:id/past-niet',
+    requireAuth,
+    action(async (req) => {
+      const result = await dates.declineProposal(matchId(req), req.user.id);
+      req.flash(
+        result.outcome === 'new_suggestion' ? 'success' : 'warning',
+        result.outcome === 'new_suggestion'
+          ? '👍 Geen probleem! Hier is een ander voorstel.'
+          : '🙈 Nog geen tijd die voor allebei past. Kies zelf een paar andere tijden, dan lukt het vast!'
+      );
       return result;
     })
   );
@@ -101,7 +120,7 @@ module.exports = (ctx) => {
     requireAuth,
     action(async (req) => {
       const result = await dates.delay(matchId(req), req.user.id, req.body.minutes);
-      req.flash('success', 'Je vertraging is doorgegeven.');
+      req.flash('success', '🏃 Doorgegeven! Je match weet dat je iets later bent.');
       return result;
     })
   );
@@ -112,7 +131,7 @@ module.exports = (ctx) => {
     action(async (req) => {
       if (req.body.confirm !== 'yes') throw new DateError('INVALID', 'Bevestig dat je wilt annuleren.');
       const result = await dates.cancel(matchId(req), req.user.id);
-      req.flash('success', 'De date is geannuleerd.');
+      req.flash('success', 'De date is geannuleerd. Geen zorgen, er komen vast nieuwe matches 💫 Ga lekker verder swipen!');
       return result;
     })
   );
@@ -140,7 +159,7 @@ module.exports = (ctx) => {
       const extra = [req.body.block === 'yes' ? 'geblokkeerd' : null, req.body.report === 'yes' ? 'gemeld bij de beheerder' : null]
         .filter(Boolean)
         .join(' en ');
-      req.flash('success', `De date is beëindigd${extra ? ` en je match is ${extra}` : ''}.`);
+      req.flash('success', `De date is beëindigd${extra ? ` en je match is ${extra}` : ''}. Fijn dat je het aangaf 💛 Pas goed op jezelf.`);
       return result;
     })
   );
@@ -150,7 +169,7 @@ module.exports = (ctx) => {
     requireAuth,
     action(async (req) => {
       const result = await dates.reportNoShow(matchId(req), req.user.id);
-      req.flash('success', 'Je no-showmelding is vastgelegd. Je match kan bezwaar maken; de beheerder beoordeelt de melding.');
+      req.flash('success', 'Je melding is vastgelegd. Jammer dat het zo ging 😕 Je match kan bezwaar maken; de beheerder beoordeelt het. Kop op: er komt vast een betere date!');
       return result;
     })
   );

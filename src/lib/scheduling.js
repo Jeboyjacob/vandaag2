@@ -52,4 +52,32 @@ function normalizeChoices(raw, allowedSlots, maxChoices) {
   return entries.sort((a, b) => a.rank - b.rank);
 }
 
-module.exports = { pickBestSlot, normalizeChoices, ValidationError };
+/**
+ * No shared slot? Suggest the available slot that is closest to what BOTH people picked.
+ * The slot that is fairest wins (smallest gap for the person who has to move the most),
+ * then the smallest total gap, then the earliest time.
+ */
+function suggestSlot(choicesA, choicesB, allowedSlots, { exclude = [] } = {}) {
+  const skip = new Set(exclude.map((d) => new Date(d).getTime()));
+  const gap = (t, choices) => Math.min(...choices.map((c) => Math.abs(new Date(c.slotStart).getTime() - t))) / 60000;
+  if (!choicesA.length || !choicesB.length) return null;
+  let best = null;
+  for (const slot of allowedSlots) {
+    const t = slot.getTime();
+    if (skip.has(t)) continue;
+    const gapA = gap(t, choicesA);
+    const gapB = gap(t, choicesB);
+    const cand = { slotStart: new Date(t), gapA, gapB, worst: Math.max(gapA, gapB), total: gapA + gapB };
+    if (
+      !best ||
+      cand.worst < best.worst ||
+      (cand.worst === best.worst && cand.total < best.total) ||
+      (cand.worst === best.worst && cand.total === best.total && cand.slotStart < best.slotStart)
+    ) {
+      best = cand;
+    }
+  }
+  return best;
+}
+
+module.exports = { pickBestSlot, suggestSlot, normalizeChoices, ValidationError };

@@ -1,9 +1,9 @@
 <%- include('partials/head') %>
 <% if (!profile) { %>
   <section class="card narrow center">
-    <h1>Niemand meer om te bekijken</h1>
-    <p>Er zijn op dit moment geen nieuwe profielen die bij jouw voorkeuren passen (en bij wiens voorkeuren jij past). Kom later terug of pas je voorkeuren aan.</p>
-    <p><a class="btn" href="/profiel">Voorkeuren aanpassen</a> <a class="btn btn-ghost" href="/matches">Mijn matches</a></p>
+    <h1>Je bent helemaal bij! 🎉</h1>
+    <p>Je hebt iedereen in de buurt gezien. Er komen steeds nieuwe mensen bij, dus kom straks weer even kijken 👀 Wil je meer zien? Maak je afstand of leeftijdsbereik wat ruimer.</p>
+    <p><a class="btn btn-primary" href="/profiel">Voorkeuren aanpassen</a> <a class="btn btn-ghost" href="/matches">Mijn matches 💘</a></p>
   </section>
 <% } else { %>
   <% const _cap = (profile.interests || []).map((k) => pOpts.INTEREST_LABEL.get(k)).filter(Boolean)[0] || ''; %>

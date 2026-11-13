@@ -101,7 +101,7 @@ module.exports = (ctx) => {
       );
       login(req, { id: rows[0].id }, (err) => {
         if (err) return next(err);
-        req.flash('success', 'Je account is aangemaakt.');
+        req.flash('success', 'Welkom bij Vandaag 🎉 Je account staat klaar!');
         res.redirect('/start');
       });
     } catch (err) {

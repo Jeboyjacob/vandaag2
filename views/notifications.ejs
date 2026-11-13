@@ -1,7 +1,7 @@
 <%- include('partials/head') %>
 <section class="card">
-  <h1>Meldingen</h1>
-  <% if (!notifications.length) { %><p>Nog geen meldingen.</p><% } else { %>
+  <h1>Meldingen 🔔</h1>
+  <% if (!notifications.length) { %><p>Nog geen meldingen. Ga lekker swipen, dan komt het vanzelf 🔥</p><% } else { %>
     <ul class="list">
       <% for (const n of notifications) { %>
         <li class="notif <%= n.read_at ? '' : 'unread' %>">

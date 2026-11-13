@@ -25,14 +25,14 @@ module.exports = (ctx) => {
         result = await matching.swipe(req.user.id, targetId, direction);
       } catch (err) {
         if (err.code === 'NOT_AVAILABLE' || err.code === 'INVALID') {
-          req.flash('warning', err.message);
+          req.flash('warning', `${err.message} Op naar de volgende! 🔥`);
           return res.redirect('/ontdekken');
         }
         throw err;
       }
-      if (result.duplicate) req.flash('warning', 'Je hebt dit profiel al beoordeeld.');
+      if (result.duplicate) req.flash('warning', 'Deze had je al gezien 😉 Op naar de volgende!');
       if (result.matched && result.isNew) {
-        req.flash('success', 'Het is een match! Kies nu de tijden waarop je vandaag kunt.');
+        req.flash('success', '💘 Het is een match! Kies nu de tijden waarop je vandaag kunt.');
         return res.redirect(`/matches/${result.matchId}`);
       }
       res.redirect('/ontdekken');

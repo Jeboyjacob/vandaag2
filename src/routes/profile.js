@@ -6,6 +6,7 @@ const { verifyCsrf, verifyPassword } = require('../lib/security');
 const { GENDERS } = require('../services/users');
 const { ageOn } = require('../lib/age');
 const opts = require('../lib/profile-options');
+const { NEIGHBORHOODS, BY_KEY } = require('../lib/neighborhoods');
 
 module.exports = (ctx) => {
   const { pool, storage, logger } = ctx;
@@ -33,7 +34,7 @@ module.exports = (ctx) => {
   }
 
   function renderProfile(res, user, { errors = [], status = 200 } = {}) {
-    res.status(status).render('profile/edit', { title: 'Mijn profiel', errors, genders: GENDERS, age: ageOn(user.birthdate), opts, promptValues: promptValues(user) });
+    res.status(status).render('profile/edit', { title: 'Mijn profiel', errors, genders: GENDERS, age: ageOn(user.birthdate), opts, promptValues: promptValues(user), neighborhoods: NEIGHBORHOODS });
   }
 
   r.get('/profiel', requireAuth, (req, res) => renderProfile(res, req.user));
@@ -58,19 +59,23 @@ module.exports = (ctx) => {
         if (v !== null && (!Number.isInteger(v) || v < 18 || v > 99)) errors.push(`${label} leeftijd moet tussen 18 en 99 liggen.`);
       }
       if (ageMin !== null && ageMax !== null && ageMin > ageMax) errors.push('Minimale leeftijd mag niet hoger zijn dan de maximale.');
+      const neighborhood = req.body.neighborhood ? String(req.body.neighborhood) : null;
+      const maxKm = req.body.max_distance_km ? Number(req.body.max_distance_km) : null;
+      if (neighborhood && !BY_KEY.has(neighborhood)) errors.push('Kies een buurt uit de lijst.');
+      if (maxKm !== null && (!Number.isInteger(maxKm) || maxKm < 1 || maxKm > 50)) errors.push('Kies een afstand tussen 1 en 50 km.');
       const extras = opts.parseExtras(req.body);
       errors.push(...extras.errors);
       if (errors.length) {
         Object.assign(req.user, { prompts: extras.prompts, interests: extras.interests, languages: extras.languages });
-        Object.assign(req.user, { display_name: name, bio, gender, pref_genders: prefGenders, pref_age_min: ageMin, pref_age_max: ageMax });
+        Object.assign(req.user, { display_name: name, bio, gender, pref_genders: prefGenders, pref_age_min: ageMin, pref_age_max: ageMax, neighborhood, max_distance_km: maxKm });
         return renderProfile(res, req.user, { errors, status: 422 });
       }
       await pool.query(
-        `UPDATE users SET display_name=$2, bio=$3, gender=$4, pref_genders=$5, pref_age_min=$6, pref_age_max=$7, prompts=$8, interests=$9, languages=$10, updated_at=now()
+        `UPDATE users SET display_name=$2, bio=$3, gender=$4, pref_genders=$5, pref_age_min=$6, pref_age_max=$7, prompts=$8, interests=$9, languages=$10, neighborhood=$11, max_distance_km=$12, updated_at=now()
           WHERE id=$1`,
-        [req.user.id, name, bio, gender, prefGenders.length ? prefGenders : null, ageMin, ageMax, JSON.stringify(extras.prompts), extras.interests, extras.languages]
+        [req.user.id, name, bio, gender, prefGenders.length ? prefGenders : null, ageMin, ageMax, JSON.stringify(extras.prompts), extras.interests, extras.languages, neighborhood, neighborhood ? maxKm : null]
       );
-      req.flash('success', 'Je profiel is opgeslagen.');
+      req.flash('success', 'Je profiel is opgeslagen ✨ Tijd om te swipen!');
       res.redirect('/profiel');
     } catch (err) {
       next(err);
@@ -115,7 +120,7 @@ module.exports = (ctx) => {
           [req.user.id, stored.key, stored.mime, req.file.size]
         );
         if (old) await storage.remove(old).catch((e) => logger.error('[upload] oude video niet verwijderd', e.message));
-        req.flash('success', 'Je video is geüpload.');
+        req.flash('success', 'Mooi, je video staat erop 🎬 Tijd om te swipen!');
         res.redirect('/profiel');
       } catch (e) {
         await storage.discardTmp(tmp).catch(() => {});
@@ -131,7 +136,7 @@ module.exports = (ctx) => {
         req.user.id,
       ]);
       await storage.remove(key);
-      req.flash('success', 'Je video is verwijderd. Zonder video is je profiel niet zichtbaar voor anderen.');
+      req.flash('success', 'Je video is verwijderd. Zonder video ben je niet zichtbaar; upload gauw een nieuwe 🎬');
       res.redirect('/profiel');
     } catch (err) {
       next(err);
