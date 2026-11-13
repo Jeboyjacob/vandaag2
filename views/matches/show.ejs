@@ -135,6 +135,7 @@
     <% } %>
     <p class="muted small">Alles staat vast, je hoeft niets meer te doen. Kan het toch niet? Annuleer gerust hieronder.</p>
     <details class="more-details"><summary>No-showregel</summary><%- include('../partials/noshow-terms') %></details>
+    <p class="center"><a class="btn btn-primary btn-lg" href="/matches/<%= plan.match_id %>/agenda.ics">📅 Zet in mijn agenda</a></p>
     <p class="center"><a class="btn btn-primary" href="/ontdekken">Tot die tijd: blijf swipen 🔥</a></p>
     <% const delays = events.filter(e => e.type === 'delayed'); %>
     <% if (delays.length) { %>

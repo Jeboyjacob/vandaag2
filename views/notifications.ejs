@@ -1,6 +1,14 @@
 <%- include('partials/head') %>
 <section class="card">
-  <h1>Meldingen 🔔</h1>
+  <div class="row-between">
+    <h1>Meldingen 🔔</h1>
+    <% if (notifications.length) { %>
+      <form method="post" action="/meldingen/wissen" class="inline" data-confirm="Alle meldingen verwijderen?">
+        <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+        <button class="btn btn-sm btn-ghost" type="submit">🗑️ Alles wissen</button>
+      </form>
+    <% } %>
+  </div>
   <% if (!notifications.length) { %><p>Nog geen meldingen. Ga lekker swipen, dan komt het vanzelf 🔥</p><% } else { %>
     <ul class="list">
       <% for (const n of notifications) { %>
@@ -10,6 +18,10 @@
             <% if (n.body) { %><span><%= n.body %></span><br><% } %>
             <span class="muted small"><%= fmt.dateTime(n.created_at) %></span>
           <% if (n.link) { %></a><% } %>
+          <form method="post" action="/meldingen/<%= n.id %>/wissen" class="inline">
+            <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+            <button class="link muted small" type="submit" aria-label="Melding verwijderen">🗑️ Verwijder</button>
+          </form>
         </li>
       <% } %>
     </ul>

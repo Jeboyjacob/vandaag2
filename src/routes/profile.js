@@ -99,7 +99,7 @@ module.exports = (ctx) => {
         [req.user.id, prefGenders.length ? prefGenders : null, ageMin, ageMax, neighborhood, neighborhood ? maxKm : null]
       );
       req.flash('success', 'Voorkeuren opgeslagen 💘 Op naar de swipes!');
-      res.redirect('/voorkeuren');
+      res.redirect('/profiel');
     } catch (err) {
       next(err);
     }

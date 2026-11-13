@@ -60,6 +60,49 @@ module.exports = (ctx) => {
     }
   });
 
+  /** Agenda-bestand (.ics): werkt met Apple Agenda, Google Agenda en Outlook. */
+  r.get('/matches/:id/agenda.ics', requireAuth, async (req, res, next) => {
+    try {
+      const data = await dates.view(matchId(req), req.user.id);
+      if (data.plan.status !== 'confirmed' || !data.plan.proposed_start) return res.redirect(`/matches/${req.params.id}`);
+      const esc = (t) => String(t).replace(/\\/g, '\\\\').replace(/;/g, '\\;').replace(/,/g, '\\,').replace(/\r?\n/g, '\\n');
+      const stamp = (d) => new Date(d).toISOString().replace(/[-:]/g, '').replace(/\.\d{3}/, '');
+      const start = new Date(data.plan.proposed_start);
+      const end = new Date(start.getTime() + 90 * 60000);
+      const v = data.venue;
+      const where = v ? `${v.name}, ${v.street_address}, ${v.postcode} ${v.city}` : '';
+      const ics = [
+        'BEGIN:VCALENDAR',
+        'VERSION:2.0',
+        'PRODID:-//Vandaag//Date//NL',
+        'CALSCALE:GREGORIAN',
+        'METHOD:PUBLISH',
+        'BEGIN:VEVENT',
+        `UID:date-${data.plan.id}-${data.plan.proposal_version}@vandaag`,
+        `DTSTAMP:${stamp(new Date())}`,
+        `DTSTART:${stamp(start)}`,
+        `DTEND:${stamp(end)}`,
+        `SUMMARY:${esc(`Date met ${data.other.display_name} 🥂`)}`,
+        `LOCATION:${esc(where)}`,
+        `DESCRIPTION:${esc('Je date via Vandaag. Kan het toch niet? Annuleer in de app.')}`,
+        'BEGIN:VALARM',
+        'TRIGGER:-PT1H',
+        'ACTION:DISPLAY',
+        `DESCRIPTION:${esc('Je date begint over een uur!')}`,
+        'END:VALARM',
+        'END:VEVENT',
+        'END:VCALENDAR',
+        '',
+      ].join('\r\n');
+      res.set('Content-Type', 'text/calendar; charset=utf-8');
+      res.set('Content-Disposition', 'attachment; filename="vandaag-date.ics"');
+      res.send(ics);
+    } catch (err) {
+      if (err instanceof DateError) return res.status(404).render('error', { title: 'Niet gevonden', message: err.message });
+      next(err);
+    }
+  });
+
   r.post(
     '/matches/:id/tijden',
     requireAuth,

@@ -28,6 +28,8 @@ function deckConditions(devMode) {
 }
 
 function createMatching({ pool, config, notifier }) {
+  // Een ja geldt maar een beperkt aantal uur (geheel getal uit de config, dus veilig in SQL).
+  const validHours = Math.max(1, Math.floor(Number(config.swipeValidHours) || 12));
   /** Next single profile to show, or null. */
   async function nextProfile(meId) {
     const { rows } = await pool.query(
@@ -35,7 +37,8 @@ function createMatching({ pool, config, notifier }) {
               ${AGE_SQL('u')} AS age
          FROM users u, users me
         WHERE me.id = $1 AND ${deckConditions(config.devMode)}
-          AND NOT EXISTS (SELECT 1 FROM swipes s WHERE s.swiper_id = me.id AND s.target_id = u.id)
+          AND NOT EXISTS (SELECT 1 FROM swipes s WHERE s.swiper_id = me.id AND s.target_id = u.id
+                 AND (s.direction = 'left' OR now() < swipe_expires_at(s.created_at, ${validHours})))
         ORDER BY md5(u.id::text || ':' || me.id::text)
         LIMIT 1`,
       [meId]
@@ -59,9 +62,13 @@ function createMatching({ pool, config, notifier }) {
       );
       if (!ok.rowCount) throw new MatchingError('NOT_AVAILABLE', 'Dit profiel is niet (meer) beschikbaar.');
 
+      // Een ja geldt maar een paar uur. Een verlopen ja mag opnieuw gegeven worden.
       const ins = await c.query(
         `INSERT INTO swipes (swiper_id, target_id, direction) VALUES ($1,$2,$3)
-         ON CONFLICT (swiper_id, target_id) DO NOTHING RETURNING id`,
+         ON CONFLICT (swiper_id, target_id) DO UPDATE SET direction = EXCLUDED.direction, created_at = now()
+           WHERE swipes.direction = 'right'
+             AND now() >= swipe_expires_at(swipes.created_at, ${validHours})
+         RETURNING id`,
         [meId, targetId, direction]
       );
       if (!ins.rowCount) return { duplicate: true, matched: false };
@@ -70,7 +77,8 @@ function createMatching({ pool, config, notifier }) {
       const [a, b] = meId < targetId ? [meId, targetId] : [targetId, meId];
       await c.query(`SELECT pg_advisory_xact_lock(hashtextextended($1, 0))`, [`match:${a}:${b}`]);
       const back = await c.query(
-        `SELECT 1 FROM swipes WHERE swiper_id = $1 AND target_id = $2 AND direction = 'right'`,
+        `SELECT 1 FROM swipes WHERE swiper_id = $1 AND target_id = $2 AND direction = 'right'
+            AND now() < swipe_expires_at(created_at, ${validHours})`,
         [targetId, meId]
       );
       if (!back.rowCount) return { duplicate: false, matched: false };
@@ -126,4 +134,4 @@ function createMatching({ pool, config, notifier }) {
   return { nextProfile, swipe, listMatches };
 }
 
-module.exports = { createMatching, MatchingError };
+module.exports = { createMatching, MatchingError, deckConditions };

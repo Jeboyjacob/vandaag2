@@ -344,3 +344,31 @@ test('match page renders for suggestion, confirmed, cancelled; profile page show
   const row = (await env.pool.query('SELECT neighborhood, max_distance_km, pref_age_min FROM users WHERE id=$1', [a.id])).rows[0];
   assert.deepEqual(row, { neighborhood: 'oost', max_distance_km: 5, pref_age_min: 25 });
 });
+
+test('confirmed date can be added to the calendar (.ics)', async () => {
+  const { a, matchId } = await confirmedDate();
+  await env.pool.query(`UPDATE date_plans SET day = day WHERE match_id=$1`, [matchId]);
+  const agent = await loginAgent(env.app, a);
+  const res = await agent.get(`/matches/${matchId}/agenda.ics`);
+  assert.equal(res.status, 200);
+  assert.match(res.headers['content-type'], /text\/calendar/);
+  assert.match(res.text, /BEGIN:VEVENT/);
+  assert.match(res.text, /SUMMARY:Date met Bram/);
+  assert.match(res.text, /DTSTART:20300614T170000Z/);
+  assert.match(res.text, /LOCATION:Testbar/);
+});
+
+test('notifications can be deleted one by one or all at once, only your own', async () => {
+  const { a, b, matchId } = await confirmedDate();
+  const agent = await loginAgent(env.app, a);
+  let page = await agent.get('/meldingen');
+  const tok = page.text.match(/name="_csrf" value="([^"]+)"/)[1];
+  const mine = (await env.pool.query('SELECT id FROM notifications WHERE user_id=$1', [a.id])).rows;
+  const theirs = (await env.pool.query('SELECT id FROM notifications WHERE user_id=$1', [b.id])).rows;
+  assert.ok(mine.length && theirs.length);
+  await agent.post(`/meldingen/${theirs[0].id}/wissen`).type('form').send({ _csrf: tok });
+  assert.equal((await env.pool.query('SELECT count(*)::int n FROM notifications WHERE user_id=$1', [b.id])).rows[0].n, theirs.length);
+  await agent.post('/meldingen/wissen').type('form').send({ _csrf: tok });
+  assert.equal((await env.pool.query('SELECT count(*)::int n FROM notifications WHERE user_id=$1', [a.id])).rows[0].n, 0);
+  assert.equal((await env.pool.query('SELECT count(*)::int n FROM notifications WHERE user_id=$1', [b.id])).rows[0].n, theirs.length);
+});

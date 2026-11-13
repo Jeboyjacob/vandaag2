@@ -222,3 +222,61 @@ test('distance: mutual neighbourhood + km filter', async () => {
   await env.pool.query(`UPDATE users SET neighborhood=NULL WHERE id=$1`, [far.id]);
   assert.ok(await env.ctx.matching.nextProfile(far.id));
 });
+
+test('swipes expire: an old yes does not create a match, but can be given again today', async () => {
+  const a = await createUser(env.pool, { name: 'Oud' });
+  const b = await createUser(env.pool, { name: 'Nieuw' });
+  await env.ctx.matching.swipe(a.id, b.id, 'right');
+  await env.pool.query(`UPDATE swipes SET created_at = now() - interval '3 days' WHERE swiper_id=$1`, [a.id]);
+  const r = await env.ctx.matching.swipe(b.id, a.id, 'right');
+  assert.equal(r.matched, false);
+  assert.equal((await env.pool.query('SELECT count(*)::int n FROM matches')).rows[0].n, 0);
+  // a sees b again today and swipes right again -> b's yes from today counts -> match
+  const next = await env.ctx.matching.nextProfile(a.id);
+  assert.equal(next.id, b.id);
+  const r2 = await env.ctx.matching.swipe(a.id, b.id, 'right');
+  assert.equal(r2.matched, true);
+  // an old "no" never comes back
+  const c = await createUser(env.pool, { name: 'Nee' });
+  await env.ctx.matching.swipe(a.id, c.id, 'left');
+  await env.pool.query(`UPDATE swipes SET created_at = now() - interval '3 days' WHERE swiper_id=$1 AND target_id=$2`, [a.id, c.id]);
+  assert.equal(await env.ctx.matching.nextProfile(a.id), null);
+});
+
+test('a yes from a few hours ago still matches', async () => {
+  const a = await createUser(env.pool, { name: 'Vroeg' });
+  const b = await createUser(env.pool, { name: 'Laat' });
+  await env.ctx.matching.swipe(a.id, b.id, 'right');
+  await env.pool.query(`UPDATE swipes SET created_at = now() - interval '11 hours' WHERE swiper_id=$1`, [a.id]);
+  assert.equal((await env.ctx.matching.swipe(b.id, a.id, 'right')).matched, true);
+});
+
+test('a yes stays until the next morning 10:00 when given in the evening', async () => {
+  const r = await env.pool.query(`SELECT swipe_expires_at(timestamptz '2030-06-14 22:00+02', 12) AS e1, swipe_expires_at(timestamptz '2030-06-14 08:00+02', 12) AS e2, swipe_expires_at(timestamptz '2030-06-14 11:00+02', 12) AS e3`);
+  const iso = (d) => d.toISOString();
+  assert.equal(iso(r.rows[0].e1), '2030-06-15T08:00:00.000Z'); // 10:00 Amsterdam
+  assert.equal(iso(r.rows[0].e2), '2030-06-14T18:00:00.000Z'); // 08:00 + 12u = 20:00 Amsterdam
+  assert.equal(iso(r.rows[0].e3), '2030-06-15T08:00:00.000Z'); // volgende ochtend 10:00
+});
+
+test('new-people notice: needs enough new profiles, max once a day, only in the app', async () => {
+  const { notifyNewPeople } = require('../src/services/new-people');
+  const me = await createUser(env.pool, { name: 'Ik' });
+  await env.pool.query(`UPDATE users SET created_at = now() - interval '5 days', last_new_people_notice_at = NULL WHERE id=$1`, [me.id]);
+  for (let i = 0; i < 2; i++) await createUser(env.pool, { name: `N${i}` });
+  const noon = new Date(); noon.setUTCHours(11, 0, 0, 0);
+  const deps = { pool: env.pool, config: env.config, notifier: env.ctx.notifier };
+  await env.pool.query(`UPDATE users SET video_uploaded_at = now()`);
+  assert.equal((await notifyNewPeople(deps, noon)).sent, 0); // slechts 2 nieuwe
+  await createUser(env.pool, { name: 'N3' });
+  await env.pool.query(`UPDATE users SET video_uploaded_at = now() WHERE id <> $1`, [me.id]);
+  const night = new Date(); night.setUTCHours(1, 0, 0, 0);
+  assert.equal((await notifyNewPeople(deps, night)).sent, 0); // 's nachts niet
+  const r = await notifyNewPeople(deps, noon);
+  assert.ok(r.sent >= 1);
+  const note = (await env.pool.query(`SELECT * FROM notifications WHERE user_id=$1 AND type='new_people'`, [me.id])).rows;
+  assert.equal(note.length, 1);
+  assert.match(note[0].title, /3 nieuwe mensen/);
+  assert.notEqual(note[0].email_status, 'sent'); // geen e-mail
+  assert.equal((await notifyNewPeople(deps, noon)).sent, 0); // nooit twee op één dag
+});

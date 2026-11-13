@@ -19,6 +19,25 @@ module.exports = (ctx) => {
     }
   });
 
+  r.post('/meldingen/wissen', requireAuth, async (req, res, next) => {
+    try {
+      await pool.query('DELETE FROM notifications WHERE user_id=$1', [req.user.id]);
+      req.flash('success', 'Alles opgeschoond ✨');
+      res.redirect('/meldingen');
+    } catch (err) {
+      next(err);
+    }
+  });
+
+  r.post('/meldingen/:id/wissen', requireAuth, async (req, res, next) => {
+    try {
+      await pool.query('DELETE FROM notifications WHERE id=$1 AND user_id=$2', [Number(req.params.id) || 0, req.user.id]);
+      res.redirect('/meldingen');
+    } catch (err) {
+      next(err);
+    }
+  });
+
   // Lightweight polling endpoint for the unread badge.
   r.get('/api/meldingen/aantal', requireAuth, (req, res) => {
     res.set('Cache-Control', 'no-store');
