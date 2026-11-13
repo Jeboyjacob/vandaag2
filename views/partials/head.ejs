@@ -21,7 +21,7 @@
       <a href="/ontdekken" class="<%= path.startsWith('/ontdekken') ? 'active' : '' %>"><span class="ico" aria-hidden="true">◎</span><span>Ontdekken</span></a>
       <a href="/matches" class="<%= path.startsWith('/matches') ? 'active' : '' %>"><span class="ico" aria-hidden="true">♥</span><span>Matches</span></a>
       <a href="/meldingen" class="<%= path.startsWith('/meldingen') ? 'active' : '' %>"><span class="ico" aria-hidden="true">●</span><span>Meldingen</span><span class="badge" data-unread <%= unreadCount ? '' : 'hidden' %>><%= unreadCount %></span></a>
-      <a href="/profiel" class="<%= path.startsWith('/profiel') || path.startsWith('/account') ? 'active' : '' %>"><span class="ico" aria-hidden="true">☺</span><span>Profiel</span></a>
+      <a href="/profiel" class="<%= path.startsWith('/profiel') || path.startsWith('/voorkeuren') || path.startsWith('/account') ? 'active' : '' %>"><span class="ico" aria-hidden="true">☺</span><span>Profiel</span></a>
       <% if (user.role === 'admin') { %><a href="/beheer" class="<%= path.startsWith('/beheer') ? 'active' : '' %>"><span class="ico" aria-hidden="true">⚙</span><span>Beheer</span></a><% } %>
     </nav>
   <% } else { %>

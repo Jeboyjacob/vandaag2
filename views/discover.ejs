@@ -3,10 +3,11 @@
   <section class="card narrow center">
     <h1>Je bent helemaal bij! 🎉</h1>
     <p>Je hebt iedereen in de buurt gezien. Er komen steeds nieuwe mensen bij, dus kom straks weer even kijken 👀 Wil je meer zien? Maak je afstand of leeftijdsbereik wat ruimer.</p>
-    <p><a class="btn btn-primary" href="/profiel">Voorkeuren aanpassen</a> <a class="btn btn-ghost" href="/matches">Mijn matches 💘</a></p>
+    <p><a class="btn btn-primary" href="/voorkeuren">Voorkeuren aanpassen</a> <a class="btn btn-ghost" href="/matches">Mijn matches 💘</a></p>
   </section>
 <% } else { %>
   <% const _cap = (profile.interests || []).map((k) => pOpts.INTEREST_LABEL.get(k)).filter(Boolean)[0] || ''; %>
+  <p class="center small"><a class="btn btn-sm btn-ghost" href="/voorkeuren">⚙️ Date-voorkeuren</a></p>
   <section class="swipe" data-swipe>
     <article class="swipe-card" data-card>
       <video class="swipe-video" src="/media/video/<%= profile.id %>" autoplay muted loop playsinline preload="auto" data-video></video>

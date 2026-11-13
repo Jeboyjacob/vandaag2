@@ -45,15 +45,42 @@ module.exports = (ctx) => {
       const name = String(req.body.display_name || '').trim();
       const bio = String(req.body.bio || '').trim();
       const gender = req.body.gender || null;
+      if (!name || name.length > 40) errors.push('Naam is verplicht (max. 40 tekens).');
+      if (bio.length > 300) errors.push('Profieltekst mag maximaal 300 tekens zijn.');
+      if (gender && !GENDERS.includes(gender)) errors.push('Ongeldige keuze voor gender.');
+      const extras = opts.parseExtras(req.body);
+      errors.push(...extras.errors);
+      if (errors.length) {
+        Object.assign(req.user, { prompts: extras.prompts, interests: extras.interests, languages: extras.languages });
+        Object.assign(req.user, { display_name: name, bio, gender });
+        return renderProfile(res, req.user, { errors, status: 422 });
+      }
+      await pool.query(
+        `UPDATE users SET display_name=$2, bio=$3, gender=$4, prompts=$5, interests=$6, languages=$7, updated_at=now()
+          WHERE id=$1`,
+        [req.user.id, name, bio, gender, JSON.stringify(extras.prompts), extras.interests, extras.languages]
+      );
+      req.flash('success', 'Je profiel is opgeslagen ✨ Tijd om te swipen!');
+      res.redirect('/profiel');
+    } catch (err) {
+      next(err);
+    }
+  });
+
+  function renderPrefs(res, user, { errors = [], status = 200 } = {}) {
+    res.status(status).render('profile/preferences', { title: 'Date-voorkeuren', errors, genders: GENDERS, neighborhoods: NEIGHBORHOODS });
+  }
+
+  r.get('/voorkeuren', requireAuth, (req, res) => renderPrefs(res, req.user));
+
+  r.post('/voorkeuren', requireAuth, async (req, res, next) => {
+    try {
+      const errors = [];
       let prefGenders = req.body.pref_genders;
       if (prefGenders === undefined || prefGenders === '') prefGenders = [];
       if (!Array.isArray(prefGenders)) prefGenders = [prefGenders];
       const ageMin = req.body.pref_age_min ? Number(req.body.pref_age_min) : null;
       const ageMax = req.body.pref_age_max ? Number(req.body.pref_age_max) : null;
-
-      if (!name || name.length > 40) errors.push('Naam is verplicht (max. 40 tekens).');
-      if (bio.length > 300) errors.push('Profieltekst mag maximaal 300 tekens zijn.');
-      if (gender && !GENDERS.includes(gender)) errors.push('Ongeldige keuze voor gender.');
       if (prefGenders.some((g) => !GENDERS.includes(g))) errors.push('Ongeldige voorkeur voor gender.');
       for (const [label, v] of [['Minimale', ageMin], ['Maximale', ageMax]]) {
         if (v !== null && (!Number.isInteger(v) || v < 18 || v > 99)) errors.push(`${label} leeftijd moet tussen 18 en 99 liggen.`);
@@ -63,20 +90,16 @@ module.exports = (ctx) => {
       const maxKm = req.body.max_distance_km ? Number(req.body.max_distance_km) : null;
       if (neighborhood && !BY_KEY.has(neighborhood)) errors.push('Kies een buurt uit de lijst.');
       if (maxKm !== null && (!Number.isInteger(maxKm) || maxKm < 1 || maxKm > 50)) errors.push('Kies een afstand tussen 1 en 50 km.');
-      const extras = opts.parseExtras(req.body);
-      errors.push(...extras.errors);
       if (errors.length) {
-        Object.assign(req.user, { prompts: extras.prompts, interests: extras.interests, languages: extras.languages });
-        Object.assign(req.user, { display_name: name, bio, gender, pref_genders: prefGenders, pref_age_min: ageMin, pref_age_max: ageMax, neighborhood, max_distance_km: maxKm });
-        return renderProfile(res, req.user, { errors, status: 422 });
+        Object.assign(req.user, { pref_genders: prefGenders, pref_age_min: ageMin, pref_age_max: ageMax, neighborhood, max_distance_km: maxKm });
+        return renderPrefs(res, req.user, { errors, status: 422 });
       }
       await pool.query(
-        `UPDATE users SET display_name=$2, bio=$3, gender=$4, pref_genders=$5, pref_age_min=$6, pref_age_max=$7, prompts=$8, interests=$9, languages=$10, neighborhood=$11, max_distance_km=$12, updated_at=now()
-          WHERE id=$1`,
-        [req.user.id, name, bio, gender, prefGenders.length ? prefGenders : null, ageMin, ageMax, JSON.stringify(extras.prompts), extras.interests, extras.languages, neighborhood, neighborhood ? maxKm : null]
+        `UPDATE users SET pref_genders=$2, pref_age_min=$3, pref_age_max=$4, neighborhood=$5, max_distance_km=$6, updated_at=now() WHERE id=$1`,
+        [req.user.id, prefGenders.length ? prefGenders : null, ageMin, ageMax, neighborhood, neighborhood ? maxKm : null]
       );
-      req.flash('success', 'Je profiel is opgeslagen ✨ Tijd om te swipen!');
-      res.redirect('/profiel');
+      req.flash('success', 'Voorkeuren opgeslagen 💘 Op naar de swipes!');
+      res.redirect('/voorkeuren');
     } catch (err) {
       next(err);
     }

@@ -335,6 +335,12 @@ test('match page renders for suggestion, confirmed, cancelled; profile page show
   await d().cancel(matchId, b.id);
   page = await aa.get(`/matches/${matchId}`);
   assert.match(page.text, /niet getreurd/);
-  const prof = await aa.get('/profiel');
-  assert.match(prof.text, /Buurt in Amsterdam/);
+  const prefs = await aa.get('/voorkeuren');
+  assert.equal(prefs.status, 200);
+  assert.match(prefs.text, /Buurt in Amsterdam/);
+  const tok = (await aa.get('/voorkeuren')).text.match(/name="_csrf" value="([^"]+)"/)[1];
+  const save = await aa.post('/voorkeuren').type('form').send({ _csrf: tok, neighborhood: 'oost', max_distance_km: '5', pref_age_min: '25' });
+  assert.equal(save.status, 302);
+  const row = (await env.pool.query('SELECT neighborhood, max_distance_km, pref_age_min FROM users WHERE id=$1', [a.id])).rows[0];
+  assert.deepEqual(row, { neighborhood: 'oost', max_distance_km: 5, pref_age_min: 25 });
 });
