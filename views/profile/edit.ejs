@@ -20,7 +20,7 @@
   <form method="post" action="/profiel/video" enctype="multipart/form-data" class="form upload-form">
     <input type="hidden" name="_csrf" value="<%= csrfToken %>">
     <label><%= user.video_key ? 'Nieuwe video uploaden' : 'Video uploaden' %>
-      <input type="file" name="video" accept="video/mp4,video/quicktime,video/webm" capture="user" required>
+  <input type="file" name="video" accept="video/*" required>
     </label>
     <progress class="upload-progress" max="100" value="0" hidden></progress>
     <button class="btn btn-primary" type="submit">Uploaden</button>
