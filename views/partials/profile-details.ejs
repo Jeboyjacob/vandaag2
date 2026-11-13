@@ -1,0 +1,28 @@
+<%
+  const _opts = pOpts;
+  const _prompts = _opts.promptsForDisplay(p.prompts);
+  const _mine = (typeof mine !== 'undefined' && mine) ? mine : [];
+  const _interests = (p.interests || []).filter((k) => _opts.INTEREST_LABEL.has(k));
+  const _shared = _interests.filter((k) => _mine.includes(k));
+  const _others = _interests.filter((k) => !_mine.includes(k));
+  const _langs = (p.languages || []).filter((k) => _opts.LANGUAGE_LABEL.has(k));
+%>
+<% if (p.bio) { %><p class="detail-bio"><%= p.bio %></p><% } %>
+<% for (const q of _prompts) { %>
+  <div class="prompt-card"><p class="prompt-q"><%= q.question %></p><p class="prompt-a"><%= q.answer %></p></div>
+<% } %>
+<% if (_interests.length) { %>
+  <h3 class="detail-h">Interesses</h3>
+  <div class="chips chips-static">
+    <% for (const k of _shared) { %><span class="chip-static chip-shared" title="Dit hebben jullie allebei"><%= _opts.INTEREST_LABEL.get(k) %></span><% } %>
+    <% for (const k of _others) { %><span class="chip-static"><%= _opts.INTEREST_LABEL.get(k) %></span><% } %>
+  </div>
+  <% if (_shared.length) { %><p class="small muted">Roze = dit hebben jullie allebei.</p><% } %>
+<% } %>
+<% if (_langs.length) { %>
+  <h3 class="detail-h">Spreekt</h3>
+  <p><%= _langs.map((k) => _opts.LANGUAGE_LABEL.get(k)).join(' · ') %></p>
+<% } %>
+<% if (!p.bio && !_prompts.length && !_interests.length && !_langs.length) { %>
+  <p class="muted">Deze persoon heeft nog niets ingevuld naast de video.</p>
+<% } %>

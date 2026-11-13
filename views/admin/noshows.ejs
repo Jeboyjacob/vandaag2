@@ -1,0 +1,36 @@
+<%- include('../partials/head') %>
+<section class="card">
+  <h1>No-shows</h1>
+  <div class="notice notice-warning">
+    Er wordt <strong>niets automatisch geïnd</strong>. <%= paymentsConfigured ? '' : 'Er is nog geen betaalprovider gekoppeld. ' %>Ook moet nog worden vastgesteld hoe een no-show definitief wordt bepaald. Een beoordeling "terecht" verandert alleen de status.
+  </div>
+  <% const st = { reported: 'Gemeld', disputed: 'Bezwaar', upheld: 'Terecht', rejected: 'Onterecht' }; %>
+  <% if (!reports.length) { %><p>Geen no-showmeldingen.</p><% } %>
+  <% for (const r of reports) { %>
+    <article class="report <%= r.status === 'disputed' ? 'report-urgent' : '' %>">
+      <header class="row-between">
+        <strong><%= r.reported_name || '(verwijderd)' %> niet gekomen? — gemeld door <%= r.reporter_name || '(verwijderd)' %></strong>
+        <span class="tag"><%= st[r.status] %></span>
+      </header>
+      <p class="small">Afspraak: <%= fmt.dateTime(r.scheduled_start) %> bij <%= r.venue_name %> (<%= r.venue_address %>) · gemeld <%= fmt.dateTime(r.reported_at) %> · <%= fmt.euro(r.fee_cents) %> · betaling: <%= r.payment_status %></p>
+      <% if (r.counter_reports) { %><p class="tag tag-warn">Let op: beide gebruikers hebben elkaar als no-show gemeld.</p><% } %>
+      <% if (r.dispute_text) { %><p class="quote"><strong>Bezwaar:</strong> <%= r.dispute_text %></p><% } %>
+      <% if (r.events) { %>
+        <details><summary>Tijdlijn van de date</summary><ul class="small">
+          <% for (const e of r.events) { %><li><%= fmt.dateTime(new Date(e.at)) %> — <%= e.type %><%= e.user_id === r.reporter_id ? ' (melder)' : e.user_id === r.reported_user_id ? ' (gemelde)' : '' %><%= e.payload && e.payload.minutes ? ' ' + e.payload.minutes + ' min' : '' %></li><% } %>
+        </ul></details>
+      <% } %>
+      <% if (['reported', 'disputed'].includes(r.status)) { %>
+        <form method="post" action="/beheer/no-shows/<%= r.id %>" class="form compact">
+          <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+          <label>Toelichting (zichtbaar voor beide gebruikers) <input name="admin_note" maxlength="2000"></label>
+          <div class="row">
+            <button class="btn btn-sm" name="decision" value="upheld">Terecht</button>
+            <button class="btn btn-sm btn-ghost" name="decision" value="rejected">Onterecht</button>
+          </div>
+        </form>
+      <% } else if (r.admin_note) { %><p class="small muted">Toelichting: <%= r.admin_note %></p><% } %>
+    </article>
+  <% } %>
+</section>
+<%- include('../partials/foot') %>

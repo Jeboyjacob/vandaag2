@@ -1,0 +1,37 @@
+<%- include('partials/head') %>
+<%
+  const statusText = { reported: 'Gemeld — wacht op beoordeling', disputed: 'Bezwaar ingediend — wordt beoordeeld', upheld: 'Beoordeeld: terecht', rejected: 'Beoordeeld: onterecht' };
+  const payText = { not_collected: 'Niet geïnd', pending: 'Betaling loopt', paid: 'Betaald', failed: 'Betaling mislukt', waived: 'Geen kosten' };
+  const iAmReported = report.reported_user_id === user.id;
+%>
+<section class="card narrow">
+  <h1>No-showmelding</h1>
+  <dl class="facts">
+    <dt>Afspraak</dt><dd><%= fmt.dateTime(report.scheduled_start) %></dd>
+    <dt>Locatie</dt><dd><%= report.venue_name %>, <%= report.venue_address %></dd>
+    <dt>Gemeld op</dt><dd><%= fmt.dateTime(report.reported_at) %></dd>
+    <dt>Rol</dt><dd><%= iAmReported ? 'Jij bent gemeld als no-show' : 'Jij hebt de no-show gemeld' %></dd>
+    <dt>Status</dt><dd><strong><%= statusText[report.status] %></strong></dd>
+    <dt>No-showkosten</dt><dd><%= fmt.euro(report.fee_cents) %> — <%= payText[report.payment_status] %></dd>
+  </dl>
+  <% if (report.payment_status === 'not_collected') { %>
+    <p class="muted small">Er is geen geld geïnd<%= paymentsConfigured ? '' : ': er is nog geen betaalprovider gekoppeld' %>.</p>
+  <% } %>
+  <% if (report.admin_note && ['upheld','rejected'].includes(report.status)) { %>
+    <p><strong>Toelichting beheerder:</strong> <%= report.admin_note %></p>
+  <% } %>
+  <% if (report.dispute_text) { %>
+    <p><strong>Bezwaar:</strong> <%= report.dispute_text %></p>
+  <% } %>
+  <% if (iAmReported && report.status === 'reported') { %>
+    <h2>Bezwaar maken</h2>
+    <p>Was je er wel, of had je de date op tijd geannuleerd? Leg uit wat er is gebeurd. De beheerder beoordeelt de melding.</p>
+    <form method="post" action="/no-shows/<%= report.id %>/bezwaar" class="form">
+      <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+      <textarea name="dispute_text" rows="4" minlength="10" maxlength="4000" required></textarea>
+      <button class="btn btn-primary" type="submit">Bezwaar indienen</button>
+    </form>
+  <% } %>
+  <% if (report.match_id) { %><p><a href="/matches/<%= report.match_id %>">Naar de date</a></p><% } %>
+</section>
+<%- include('partials/foot') %>

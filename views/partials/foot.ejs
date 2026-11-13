@@ -1,0 +1,12 @@
+</main>
+<% if (user) { %>
+<footer class="footer">
+  <form method="post" action="/uitloggen" class="inline">
+    <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+    <button class="link" type="submit">Uitloggen</button>
+  </form>
+  · <a href="/geblokkeerd">Geblokkeerde personen</a>
+</footer>
+<% } %>
+</body>
+</html>

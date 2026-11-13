@@ -1,0 +1,15 @@
+<%# expects: u (user-like row with liveness_status and age_verification_status) %>
+<span class="badges">
+  <% if (u.liveness_status === 'passed') { %>
+    <span class="tag tag-ok" title="Externe gezichtscheck geslaagd">✓ Live-check geslaagd</span>
+  <% } else if (u.liveness_status === 'dev_bypass') { %>
+    <span class="tag tag-warn" title="Alleen ontwikkelmodus">Niet geverifieerd (ontwikkelmodus)</span>
+  <% } else { %>
+    <span class="tag tag-muted">Live-check niet gedaan</span>
+  <% } %>
+  <% if (u.age_verification_status === 'verified') { %>
+    <span class="tag tag-ok">✓ Leeftijd geverifieerd</span>
+  <% } else { %>
+    <span class="tag tag-muted" title="Leeftijd is zelf opgegeven">Leeftijd niet geverifieerd</span>
+  <% } %>
+</span>

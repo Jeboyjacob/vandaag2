@@ -1,0 +1,20 @@
+<%- include('../partials/head') %>
+<section class="card narrow">
+  <h1>Ik voel me niet veilig</h1>
+  <div class="notice notice-error">
+    <strong>Ben je in acuut gevaar? Bel 112.</strong> Deze app heeft geen live hulpdienst en kan niemand naar je toe sturen.
+  </div>
+  <p>Hiermee beëindig je de date met <%= other.display_name %>. <%= other.display_name %> krijgt alleen een neutrale melding dat de date is beëindigd, niet de reden.</p>
+  <form method="post" action="/matches/<%= plan.match_id %>/onveilig" class="form">
+    <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+    <label class="check"><input type="checkbox" name="block" value="yes" checked> <span><%= other.display_name %> blokkeren (jullie zien elkaar niet meer)</span></label>
+    <label class="check"><input type="checkbox" name="report" value="yes"> <span><%= other.display_name %> melden bij de beheerder</span></label>
+    <label>Toelichting voor de beheerder (optioneel)
+      <textarea name="details" rows="3" maxlength="2000"></textarea>
+    </label>
+    <p class="small muted">Een melding wordt bekeken door de beheerder van de app, niet direct en niet live.</p>
+    <button class="btn btn-danger" type="submit">Date beëindigen</button>
+  </form>
+  <p><a href="/matches/<%= plan.match_id %>">Terug</a></p>
+</section>
+<%- include('../partials/foot') %>

@@ -1,0 +1,40 @@
+<%- include('../partials/head') %>
+<section class="card">
+  <div class="row-between">
+    <h1>Locaties</h1>
+    <a class="btn btn-primary" href="/beheer/locaties/nieuw">Nieuwe locatie</a>
+  </div>
+  <p class="muted small">Voer alleen echte, openbare bars en koffieplekken (geen restaurants) in Amsterdam in, met gecontroleerde adressen en openingstijden. De app maakt geen reserveringen.</p>
+  <% if (!venues.length) { %>
+    <div class="notice notice-warning">Er zijn nog geen locaties ingevoerd. Zolang er geen locatie is, zien gebruikers bij een datevoorstel: "Er is nog geen locatie beschikbaar."</div>
+  <% } else { %>
+    <div class="table-wrap"><table class="table">
+      <thead><tr><th>Naam</th><th>Type</th><th>Adres</th><th>Open</th><th>Status</th><th></th></tr></thead>
+      <tbody>
+      <% for (const v of venues) { %>
+        <tr>
+          <td><strong><%= v.name %></strong></td>
+          <td><%= v.kind === 'koffie' ? 'Koffieplek' : 'Bar' %></td>
+          <td><%= v.street_address %>, <%= v.postcode %></td>
+          <td class="small"><% for (const [d, h] of Object.entries(v.opening_hours)) { %><%= DAY_NAMES[d].slice(0,2) %> <%= h.open %>–<%= h.close %><br><% } %></td>
+          <td><span class="tag <%= v.active ? 'tag-ok' : 'tag-muted' %>"><%= v.active ? 'actief' : 'inactief' %></span></td>
+          <td><a href="/beheer/locaties/<%= v.id %>">Aanpassen</a></td>
+        </tr>
+      <% } %>
+      </tbody>
+    </table></div>
+  <% } %>
+</section>
+<section class="card">
+  <h2>Welke gegevens zijn nodig voor een betere locatiekeuze?</h2>
+  <p>Nu kiest de app een actieve locatie die open is op de afgesproken tijd, en spreidt de dates over de locaties. Voor een echte, slimme keuze zijn later nodig:</p>
+  <ul>
+    <li>Coördinaten (lat/lon) per locatie en een (globale) locatie of buurt van beide gebruikers, met hun toestemming, om een eerlijk middelpunt te kiezen.</li>
+    <li>Actuele openingstijden inclusief feestdagen en uitzonderingen, en laatste bestelling/keukentijd.</li>
+    <li>Prijsniveau, sfeer (rustig/druk) en of de locatie geschikt is voor een eerste date (zitplaatsen, geluidsniveau).</li>
+    <li>Toegankelijkheid (rolstoel, drempels) en of de locatie alcoholvrije opties heeft.</li>
+    <li>Capaciteit of afspraken met de locatie (bijvoorbeeld een maximum aantal dates per avond).</li>
+    <li>Een bron en controledatum per gegeven, zodat verouderde informatie opvalt.</li>
+  </ul>
+</section>
+<%- include('../partials/foot') %>

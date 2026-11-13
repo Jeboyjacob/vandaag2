@@ -1,0 +1,17 @@
+<%- include('../partials/head') %>
+<section class="card narrow">
+  <h1>Nieuw wachtwoord</h1>
+  <% if (!valid) { %>
+    <div class="notice notice-error">Deze herstellink is ongeldig, al gebruikt of verlopen.</div>
+    <p><a href="/wachtwoord-vergeten">Vraag een nieuwe link aan</a></p>
+  <% } else { %>
+    <% if (error) { %><div class="notice notice-error"><%= error %></div><% } %>
+    <form method="post" action="/wachtwoord-herstellen/<%= token %>" class="form">
+      <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+      <label>Nieuw wachtwoord <input type="password" name="password" autocomplete="new-password" minlength="10" required></label>
+      <label>Herhaal wachtwoord <input type="password" name="password_confirm" autocomplete="new-password" minlength="10" required></label>
+      <button class="btn btn-primary" type="submit">Wachtwoord opslaan</button>
+    </form>
+  <% } %>
+</section>
+<%- include('../partials/foot') %>

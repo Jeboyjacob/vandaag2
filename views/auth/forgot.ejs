@@ -1,0 +1,17 @@
+<%- include('../partials/head') %>
+<section class="card narrow">
+  <h1>Wachtwoord vergeten</h1>
+  <% if (!available) { %>
+    <div class="notice notice-warning">Wachtwoordherstel is nog niet beschikbaar, omdat e-mailverzending nog niet is ingesteld. Neem contact op met de beheerder.</div>
+  <% } else { %>
+    <% if (message) { %><div class="notice notice-info"><%= message %></div><% } %>
+    <% if (error) { %><div class="notice notice-error"><%= error %></div><% } %>
+    <form method="post" action="/wachtwoord-vergeten" class="form">
+      <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+      <label>E-mailadres <input type="email" name="email" autocomplete="email" required></label>
+      <button class="btn btn-primary" type="submit">Stuur herstellink</button>
+    </form>
+  <% } %>
+  <p><a href="/inloggen">Terug naar inloggen</a></p>
+</section>
+<%- include('../partials/foot') %>

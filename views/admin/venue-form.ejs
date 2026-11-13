@@ -1,0 +1,45 @@
+<%- include('../partials/head') %>
+<section class="card narrow">
+  <h1><%= title %></h1>
+  <% if (errors.length) { %><div class="notice notice-error"><ul><% for (const e of errors) { %><li><%= e %></li><% } %></ul></div><% } %>
+  <form method="post" action="/beheer/locaties<%= venue.id ? '/' + venue.id : '' %>" class="form">
+    <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+    <label>Naam <input name="name" maxlength="120" required value="<%= venue.name || '' %>"></label>
+    <fieldset>
+      <legend>Type</legend>
+      <label class="check"><input type="radio" name="kind" value="bar" <%= venue.kind === 'bar' ? 'checked' : '' %> required> <span>Bar</span></label>
+      <label class="check"><input type="radio" name="kind" value="koffie" <%= venue.kind === 'koffie' ? 'checked' : '' %>> <span>Koffieplek</span></label>
+    </fieldset>
+    <label>Straat en huisnummer <input name="street_address" maxlength="200" required value="<%= venue.street_address || '' %>"></label>
+    <div class="row">
+      <label>Postcode <input name="postcode" maxlength="7" required placeholder="1012 AB" value="<%= venue.postcode || '' %>"></label>
+      <label>Plaats <input value="Amsterdam" disabled></label>
+    </div>
+    <label>Buurt (optioneel) <input name="neighborhood" maxlength="80" value="<%= venue.neighborhood || '' %>"></label>
+    <label>Website (optioneel) <input name="website" type="url" placeholder="https://" value="<%= venue.website || '' %>"></label>
+    <fieldset>
+      <legend>Openingstijden</legend>
+      <small>Sluit een locatie na middernacht, vul dan bijvoorbeeld open 17:00 en dicht 01:00 in.</small>
+      <% for (const d of DAY_KEYS) { const h = (venue.opening_hours || {})[d]; %>
+        <div class="hours-row">
+          <span class="day"><%= DAY_NAMES[d] %></span>
+          <input type="time" name="open_<%= d %>" value="<%= h ? h.open : '' %>" aria-label="<%= DAY_NAMES[d] %> open">
+          <span>–</span>
+          <input type="time" name="close_<%= d %>" value="<%= h ? h.close : '' %>" aria-label="<%= DAY_NAMES[d] %> dicht">
+          <label class="check small"><input type="checkbox" name="closed_<%= d %>" value="1" <%= venue.id && !h ? 'checked' : '' %>> <span>gesloten</span></label>
+        </div>
+      <% } %>
+    </fieldset>
+    <label>Bron en controledatum <input name="source_note" maxlength="300" required placeholder="Bijv. eigen website, gecontroleerd op 13-11-2026" value="<%= venue.source_note || '' %>"></label>
+    <label class="check"><input type="checkbox" name="active" value="1" <%= venue.active ? 'checked' : '' %>> <span>Actief (mag worden voorgesteld)</span></label>
+    <button class="btn btn-primary" type="submit">Opslaan</button>
+  </form>
+  <% if (venue.id) { %>
+    <form method="post" action="/beheer/locaties/<%= venue.id %>/verwijderen" data-confirm="Locatie verwijderen?">
+      <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+      <button class="btn btn-danger" type="submit">Verwijderen</button>
+    </form>
+  <% } %>
+  <p><a href="/beheer/locaties">Terug</a></p>
+</section>
+<%- include('../partials/foot') %>

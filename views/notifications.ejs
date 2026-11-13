@@ -1,0 +1,18 @@
+<%- include('partials/head') %>
+<section class="card">
+  <h1>Meldingen</h1>
+  <% if (!notifications.length) { %><p>Nog geen meldingen.</p><% } else { %>
+    <ul class="list">
+      <% for (const n of notifications) { %>
+        <li class="notif <%= n.read_at ? '' : 'unread' %>">
+          <% if (n.link) { %><a href="<%= n.link %>"><% } %>
+            <strong><%= n.title %></strong><br>
+            <% if (n.body) { %><span><%= n.body %></span><br><% } %>
+            <span class="muted small"><%= fmt.dateTime(n.created_at) %></span>
+          <% if (n.link) { %></a><% } %>
+        </li>
+      <% } %>
+    </ul>
+  <% } %>
+</section>
+<%- include('partials/foot') %>

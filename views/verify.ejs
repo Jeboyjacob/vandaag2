@@ -1,0 +1,43 @@
+<%- include('partials/head') %>
+<section class="card narrow">
+  <h1>Verificatie</h1>
+
+  <h2>Gezichtscheck</h2>
+  <p>Met de camera laat je zien dat je live voor de camera staat. Deze controle wordt uitgevoerd door een externe verificatiedienst. Deze app doet zelf geen gezichtsherkenning en bewaart geen gezichtsprofielen of biometrische gegevens.</p>
+  <% if (user.liveness_status === 'passed') { %>
+    <div class="notice notice-success">Je gezichtscheck is geslaagd.</div>
+  <% } else if (!liveness.configured) { %>
+    <div class="notice notice-warning"><strong>Nog niet beschikbaar.</strong> <%= liveness.reason %> Daarom kan de gezichtscheck nu niet worden uitgevoerd.</div>
+    <% if (devMode && user.liveness_status !== 'dev_bypass') { %>
+      <form method="post" action="/verificatie/dev-overslaan" class="dev-box">
+        <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+        <p><strong>Ontwikkelmodus.</strong> Je kunt de gezichtscheck overslaan om de app lokaal te testen. Je account wordt dan getoond als <em>niet geverifieerd</em>. Dit werkt niet in productie.</p>
+        <button class="btn" type="submit">Overslaan (alleen ontwikkeling)</button>
+      </form>
+    <% } else if (user.liveness_status === 'dev_bypass') { %>
+      <p class="muted">Overgeslagen in ontwikkelmodus — niet geverifieerd.</p>
+    <% } %>
+  <% } else { %>
+    <% if (user.liveness_status === 'pending') { %><div class="notice notice-info">Je controle wordt verwerkt.</div><% } %>
+    <% if (user.liveness_status === 'failed') { %><div class="notice notice-error">De vorige controle is niet geslaagd. Probeer het opnieuw.</div><% } %>
+    <form method="post" action="/verificatie/gezicht/start">
+      <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+      <button class="btn btn-primary" type="submit">Start gezichtscheck</button>
+    </form>
+  <% } %>
+
+  <h2>Leeftijd</h2>
+  <p>Je geboortedatum heb je zelf ingevuld. Dat bewijst je leeftijd niet. Je leeftijd geldt pas als geverifieerd na een controle door een externe dienst.</p>
+  <% if (user.age_verification_status === 'verified') { %>
+    <div class="notice notice-success">Je leeftijd is geverifieerd.</div>
+  <% } else if (!ageVerification.configured) { %>
+    <div class="notice notice-warning"><strong>Nog niet beschikbaar.</strong> <%= ageVerification.reason %> Je leeftijd staat daarom als <em>niet geverifieerd</em>.</div>
+  <% } else { %>
+    <form method="post" action="/verificatie/leeftijd/start">
+      <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+      <button class="btn" type="submit">Leeftijd verifiëren</button>
+    </form>
+  <% } %>
+  <p><a href="/start">Terug</a></p>
+</section>
+<%- include('partials/foot') %>

@@ -1,0 +1,15 @@
+<%- include('../partials/head') %>
+<section class="card narrow">
+  <h1>Account verwijderen</h1>
+  <p>Hiermee verwijder je je account, je profiel, je video, je swipes en je matches definitief. Dit kun je niet ongedaan maken.</p>
+  <p class="muted small">Meldingen en no-showdossiers waarbij je betrokken was, blijven geanonimiseerd bewaard voor afhandeling.</p>
+  <% if (error) { %><div class="notice notice-error"><%= error %></div><% } %>
+  <form method="post" action="/account/verwijderen" class="form">
+    <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+    <label>Wachtwoord <input type="password" name="password" autocomplete="current-password" required></label>
+    <label>Typ <strong>VERWIJDER</strong> om te bevestigen <input type="text" name="confirm" required autocomplete="off"></label>
+    <button class="btn btn-danger" type="submit">Account definitief verwijderen</button>
+  </form>
+  <p><a href="/profiel">Annuleren</a></p>
+</section>
+<%- include('../partials/foot') %>

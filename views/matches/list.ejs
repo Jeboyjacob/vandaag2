@@ -1,0 +1,23 @@
+<%- include('../partials/head') %>
+<section class="card">
+  <h1>Matches</h1>
+  <% const label = { collecting: 'Tijden kiezen', no_overlap: 'Geen gezamenlijke tijd — kies opnieuw', proposed: 'Voorstel — bevestigen', confirmed: 'Date definitief', cancelled: 'Geannuleerd', ended_unsafe: 'Beëindigd', expired: 'Verlopen' }; %>
+  <% if (!matches.length) { %>
+    <p>Je hebt nog geen matches. <a href="/ontdekken">Ga swipen</a>.</p>
+  <% } else { %>
+    <ul class="list">
+      <% for (const m of matches) { %>
+        <li>
+          <a class="list-item" href="/matches/<%= m.id %>">
+            <span><strong><%= m.other_name %></strong><br><span class="muted small">Match op <%= m.match_day %></span></span>
+            <span class="tag <%= m.plan_status === 'confirmed' ? 'tag-ok' : (['proposed','collecting','no_overlap'].includes(m.plan_status) ? 'tag-info' : 'tag-muted') %>">
+              <%= m.match_status === 'ended' && m.plan_status !== 'confirmed' ? 'Beëindigd' : (label[m.plan_status] || '') %>
+              <% if (m.plan_status === 'confirmed' && m.proposed_start) { %> · <%= fmt.time(m.proposed_start) %><% } %>
+            </span>
+          </a>
+        </li>
+      <% } %>
+    </ul>
+  <% } %>
+</section>
+<%- include('../partials/foot') %>

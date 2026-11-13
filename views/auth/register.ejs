@@ -1,0 +1,42 @@
+<%- include('../partials/head') %>
+<section class="card narrow">
+  <h1>Account maken</h1>
+  <% if (!registrationOpen) { %>
+    <div class="notice notice-warning">
+      <strong>Registratie is gesloten.</strong> De gezichtscheck is nog niet beschikbaar, omdat er nog geen verificatiedienst is gekoppeld. Zonder die controle laten we geen nieuwe accounts toe.
+    </div>
+    <% for (const e of errors) { %><p class="error"><%= e %></p><% } %>
+  <% } else { %>
+    <% if (errors.length) { %>
+      <div class="notice notice-error"><ul><% for (const e of errors) { %><li><%= e %></li><% } %></ul></div>
+    <% } %>
+    <form method="post" action="/registreren" class="form" novalidate>
+      <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+      <label>E-mailadres
+        <input type="email" name="email" autocomplete="email" required value="<%= values.email || '' %>">
+      </label>
+      <label>Voornaam of roepnaam
+        <input type="text" name="display_name" autocomplete="given-name" maxlength="40" required value="<%= values.display_name || '' %>">
+      </label>
+      <label>Geboortedatum
+        <input type="date" name="birthdate" required value="<%= values.birthdate || '' %>">
+        <small>Je moet 18 jaar of ouder zijn. Let op: een ingevulde geboortedatum bewijst je leeftijd niet. Je leeftijd staat als <em>niet geverifieerd</em> totdat een externe leeftijdscontrole is uitgevoerd.</small>
+      </label>
+      <label>Wachtwoord
+        <input type="password" name="password" autocomplete="new-password" minlength="10" required>
+        <small>Minimaal 10 tekens.</small>
+      </label>
+      <label>Herhaal wachtwoord
+        <input type="password" name="password_confirm" autocomplete="new-password" minlength="10" required>
+      </label>
+      <label class="check">
+        <input type="checkbox" name="accept_terms" value="yes" required>
+        <span>Ik ga akkoord met de gebruiksvoorwaarden en het privacybeleid.</span>
+      </label>
+      <% if (devMode) { %><p class="muted small">Ontwikkelmodus: de voorwaarden en het privacybeleid zijn nog niet opgesteld.</p><% } %>
+      <button class="btn btn-primary" type="submit">Account maken</button>
+    </form>
+    <p class="muted">Na het aanmaken doe je de gezichtscheck en upload je je profielvideo.</p>
+  <% } %>
+</section>
+<%- include('../partials/foot') %>

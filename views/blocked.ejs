@@ -1,0 +1,18 @@
+<%- include('partials/head') %>
+<section class="card narrow">
+  <h1>Geblokkeerde personen</h1>
+  <% if (!blocked.length) { %><p>Je hebt niemand geblokkeerd.</p><% } else { %>
+    <ul class="list">
+      <% for (const b of blocked) { %>
+        <li class="list-item">
+          <span><%= b.display_name %></span>
+          <form method="post" action="/geblokkeerd/<%= b.id %>/opheffen" class="inline" data-confirm="Blokkade opheffen?">
+            <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+            <button class="btn btn-ghost btn-sm" type="submit">Opheffen</button>
+          </form>
+        </li>
+      <% } %>
+    </ul>
+  <% } %>
+</section>
+<%- include('partials/foot') %>

@@ -1,0 +1,13 @@
+<%- include('../partials/head') %>
+<section class="card narrow">
+  <h1>Inloggen</h1>
+  <% if (error) { %><div class="notice notice-error"><%= error %></div><% } %>
+  <form method="post" action="/inloggen" class="form">
+    <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+    <label>E-mailadres <input type="email" name="email" autocomplete="email" required value="<%= email %>"></label>
+    <label>Wachtwoord <input type="password" name="password" autocomplete="current-password" required></label>
+    <button class="btn btn-primary" type="submit">Inloggen</button>
+  </form>
+  <p><a href="/wachtwoord-vergeten">Wachtwoord vergeten?</a> · <a href="/registreren">Account maken</a></p>
+</section>
+<%- include('../partials/foot') %>

@@ -1,0 +1,23 @@
+<%- include('../partials/head') %>
+<section class="card">
+  <h1>Beheer</h1>
+  <div class="stats">
+    <a class="stat" href="/beheer/locaties"><span><%= counts.venues %></span>actieve locaties</a>
+    <a class="stat" href="/beheer/meldingen"><span><%= counts.reports %></span>open meldingen</a>
+    <a class="stat" href="/beheer/no-shows"><span><%= counts.noshows %></span>no-shows te beoordelen</a>
+    <div class="stat"><span><%= counts.users %></span>accounts</div>
+  </div>
+</section>
+<section class="card">
+  <h2>Status externe diensten</h2>
+  <table class="table">
+    <tr><th>Gezichtscheck (liveness)</th><td><%= integrations.liveness.configured ? 'Gekoppeld' : 'Niet gekoppeld — publieke registratie is geblokkeerd' %></td></tr>
+    <tr><th>Leeftijdsverificatie</th><td><%= integrations.ageVerification.configured ? 'Gekoppeld' : 'Niet gekoppeld — leeftijden zijn zelf opgegeven' %></td></tr>
+    <tr><th>Betalingen (no-show)</th><td><%= integrations.payments.configured ? 'Gekoppeld' : 'Niet gekoppeld — er wordt niets geïnd' %></td></tr>
+    <tr><th>E-mail (SMTP)</th><td><%= mailConfigured ? 'Ingesteld' : 'Niet ingesteld — alleen meldingen in de app, geen wachtwoordherstel' %></td></tr>
+  </table>
+  <% if (counts.venues === 0) { %>
+    <div class="notice notice-warning">Er zijn nog geen actieve locaties. Matches krijgen wel een gezamenlijke tijd, maar kunnen hun date niet bevestigen totdat er een locatie is. <a href="/beheer/locaties/nieuw">Voeg een locatie toe</a>.</div>
+  <% } %>
+</section>
+<%- include('../partials/foot') %>

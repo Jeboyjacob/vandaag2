@@ -1,0 +1,24 @@
+<%- include('partials/head') %>
+<section class="card narrow">
+  <h1><%= target.display_name %> melden</h1>
+  <% if (error) { %><div class="notice notice-error"><%= error %></div><% } %>
+  <form method="post" action="/melden/<%= target.id %>" class="form">
+    <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+    <fieldset>
+      <legend>Wat wil je melden?</legend>
+      <label class="check"><input type="radio" name="kind" value="profile" checked> <span>Het profiel</span></label>
+      <label class="check"><input type="radio" name="kind" value="video"> <span>De video</span></label>
+    </fieldset>
+    <label>Reden
+      <select name="reason" required>
+        <option value="">Kies een reden</option>
+        <% for (const r of reasons) { %><option><%= r %></option><% } %>
+      </select>
+    </label>
+    <label>Toelichting (optioneel) <textarea name="details" rows="3" maxlength="2000"></textarea></label>
+    <label class="check"><input type="checkbox" name="also_block" value="yes"> <span><%= target.display_name %> ook blokkeren</span></label>
+    <button class="btn btn-primary" type="submit">Melding versturen</button>
+  </form>
+  <p class="small muted">Meldingen worden bekeken door de beheerder. Ben je in gevaar, bel 112.</p>
+</section>
+<%- include('partials/foot') %>

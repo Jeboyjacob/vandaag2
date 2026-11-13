@@ -1,0 +1,34 @@
+# Testversie op Render voor vrienden. NIET voor echte gebruikers (ontwikkelmodus staat aan).
+services:
+  - type: web
+    name: vandaag-test
+    runtime: docker
+    plan: starter            # betaald: nodig voor een schijf waar video's blijven staan
+    healthCheckPath: /
+    disk:
+      name: videos
+      mountPath: /data
+      sizeGB: 1
+    envVars:
+      - key: NODE_ENV
+        value: development
+      - key: DEV_MODE
+        value: "true"
+      - key: TRUST_PROXY
+        value: "1"
+      - key: UPLOAD_DIR
+        value: /data/uploads
+      - key: APP_NAME
+        value: Vandaag
+      - key: SESSION_SECRET
+        generateValue: true
+      - key: DATABASE_URL
+        fromDatabase:
+          name: vandaag-db
+          property: connectionString
+      - key: APP_BASE_URL
+        sync: false          # vul in na de eerste deploy: je https://...onrender.com adres
+
+databases:
+  - name: vandaag-db
+    plan: free               # gratis database verloopt na 30 dagen; daarna ~€6/maand of stoppen

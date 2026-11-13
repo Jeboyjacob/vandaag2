@@ -1,0 +1,12 @@
+<div class="terms">
+  <h3>No-showregel</h3>
+  <ul>
+    <li>Kom je niet opdagen bij een definitieve date, dan betaal je <strong><%= noShowFee %></strong> no-showkosten aan <%= companyName %>.</li>
+    <li>Het volledige bedrag gaat naar <%= companyName %>. Je match krijgt geen deel of uitbetaling.</li>
+    <li>Je match kan een no-show pas melden als er <%= noShowDelay %> minuten zijn verstreken na de afgesproken starttijd.</li>
+    <li>Klopt een melding niet, dan kun je bezwaar maken. De melding wordt dan beoordeeld.</li>
+  </ul>
+  <% if (!paymentsConfigured) { %>
+    <p class="muted small">Op dit moment wordt er nog geen geld geïnd: er is nog geen betaalprovider gekoppeld.</p>
+  <% } %>
+</div>
