@@ -3,6 +3,7 @@ const { loadConfig } = require('./config');
 const { createPool, migrate } = require('./db');
 const { createApp } = require('./app');
 const { notifyNewPeople } = require('./services/new-people');
+const { cleanupOldData } = require('./services/cleanup');
 
 async function main() {
   const config = loadConfig();
@@ -21,6 +22,13 @@ async function main() {
     notifyNewPeople({ pool, config, notifier: ctx.notifier }).catch((e) => console.error('Melding nieuwe mensen mislukt:', e.message));
   }, 30 * 60 * 1000);
   timer.unref();
+  // Opruimen van afgelopen matches en oude meldingen: bij het opstarten en daarna elke 6 uur.
+  const clean = () =>
+    cleanupOldData({ pool, config })
+      .then((r) => (r.matches || r.notifications) && console.log(`Opruimen: ${r.matches} matches, ${r.notifications} meldingen verwijderd`))
+      .catch((e) => console.error('Opruimen mislukt:', e.message));
+  clean();
+  setInterval(clean, 6 * 60 * 60 * 1000).unref();
   const shutdown = () => server.close(() => pool.end().then(() => process.exit(0)));
   process.on('SIGTERM', shutdown);
   process.on('SIGINT', shutdown);

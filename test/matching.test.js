@@ -280,3 +280,28 @@ test('new-people notice: needs enough new profiles, max once a day, only in the 
   assert.notEqual(note[0].email_status, 'sent'); // geen e-mail
   assert.equal((await notifyNewPeople(deps, noon)).sent, 0); // nooit twee op één dag
 });
+
+test('old matches disappear from the list and are deleted after the retention period', async () => {
+  const { cleanupOldData } = require('../src/services/cleanup');
+  const a = await createUser(env.pool, { name: 'A' });
+  const b = await createUser(env.pool, { name: 'B' });
+  await env.ctx.matching.swipe(a.id, b.id, 'right');
+  const r = await env.ctx.matching.swipe(b.id, a.id, 'right');
+  assert.equal((await env.ctx.matching.listMatches(a.id)).length, 1);
+  await env.pool.query(`UPDATE matches SET match_day = (now() AT TIME ZONE 'Europe/Amsterdam')::date - 1 WHERE id=$1`, [r.matchId]);
+  assert.equal((await env.ctx.matching.listMatches(a.id)).length, 0); // uit de lijst
+  assert.equal((await cleanupOldData({ pool: env.pool, config: env.config })).matches, 0); // nog bewaard
+  await env.pool.query(`UPDATE matches SET match_day = (now() AT TIME ZONE 'Europe/Amsterdam')::date - 8 WHERE id=$1`, [r.matchId]);
+  // een openstaande no-showmelding houdt de match vast
+  const plan = (await env.pool.query('SELECT id FROM date_plans WHERE match_id=$1', [r.matchId])).rows[0];
+  await env.pool.query(
+    `INSERT INTO noshow_reports (plan_id, reporter_id, reported_user_id, scheduled_start, venue_name, venue_address, fee_cents)
+     VALUES ($1,$2,$3, now() - interval '8 days', 'X', 'Y', 750)`,
+    [plan.id, a.id, b.id]
+  );
+  assert.equal((await cleanupOldData({ pool: env.pool, config: env.config })).matches, 0);
+  await env.pool.query(`UPDATE noshow_reports SET status='rejected'`);
+  assert.equal((await cleanupOldData({ pool: env.pool, config: env.config })).matches, 1);
+  assert.equal((await env.pool.query('SELECT count(*)::int n FROM date_plans')).rows[0].n, 0);
+  assert.equal((await env.pool.query('SELECT count(*)::int n FROM noshow_reports')).rows[0].n, 1); // melding zelf blijft
+});

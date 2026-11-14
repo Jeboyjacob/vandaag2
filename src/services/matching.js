@@ -125,6 +125,7 @@ function createMatching({ pool, config, notifier }) {
          LEFT JOIN date_plans p ON p.match_id = m.id
         WHERE (m.user_a = $1 OR m.user_b = $1)
           AND NOT EXISTS (SELECT 1 FROM blocks b WHERE b.blocker_id = $1 AND b.blocked_id = o.id)
+          AND m.match_day >= (now() AT TIME ZONE 'Europe/Amsterdam')::date
         ORDER BY m.created_at DESC`,
       [meId]
     );

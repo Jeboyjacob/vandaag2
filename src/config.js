@@ -55,6 +55,7 @@ function loadConfig(env = process.env) {
     trustProxy: env.TRUST_PROXY || '',
     uploadDir: env.UPLOAD_DIR || './data/uploads',
     videoMaxMb: int(env.VIDEO_MAX_MB, 100),
+    matchRetentionDays: int(env.MATCH_RETENTION_DAYS, 7), // zo lang blijft een afgelopen match bewaard
     newPeopleMinCount: int(env.NEW_PEOPLE_MIN, 3), // vanaf zoveel nieuwe profielen sturen we een melding
     swipeValidHours: int(env.SWIPE_VALID_HOURS, 12), // zo lang telt een ja mee voor een match
     rateLimitDisabled: nodeEnv === 'test' && bool(env.RATE_LIMIT_DISABLED),
