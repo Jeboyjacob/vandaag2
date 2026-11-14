@@ -1,0 +1,51 @@
+<%- include('partials/head') %>
+<% if (!profile) { %>
+  <section class="card narrow center">
+    <h1>Je bent helemaal bij! 🎉</h1>
+    <p>Je hebt iedereen in de buurt gezien. Er komen steeds nieuwe mensen bij, dus kom straks weer even kijken 👀 Wil je meer zien? Maak je afstand of leeftijdsbereik wat ruimer.</p>
+    <p><a class="btn btn-primary" href="/voorkeuren">Voorkeuren aanpassen</a> <a class="btn btn-ghost" href="/matches">Mijn matches 💘</a></p>
+  </section>
+<% } else { %>
+  <% const _cap = (profile.interests || []).map((k) => pOpts.INTEREST_LABEL.get(k)).filter(Boolean)[0] || ''; %>
+  <p class="center small"><a class="btn btn-sm btn-ghost" href="/voorkeuren">⚙️ Date-voorkeuren</a></p>
+  <section class="swipe" data-swipe>
+    <article class="swipe-card" data-card>
+      <video class="swipe-video" src="/media/video/<%= profile.id %>" autoplay muted loop playsinline preload="auto" data-video></video>
+      <button class="sound-toggle" type="button" data-sound aria-label="Geluid aan">🔇</button>
+      <div class="swipe-info">
+        <% if (_cap) { %><span class="swipe-caption">Ik hou van <em><%= _cap %></em></span><br><% } %>
+        <h1><%= profile.display_name %> <span class="age"><%= profile.age %></span></h1>
+        <%- include('partials/badges', { u: profile }) %>
+        <% const _o = pOpts; const _sh = (profile.interests || []).filter((k) => (user.interests || []).includes(k) && _o.INTEREST_LABEL.has(k)); %>
+        <% if (_sh.length) { %><p class="swipe-shared">Jullie delen: <%= _sh.slice(0, 3).map((k) => _o.INTEREST_LABEL.get(k)).join(', ') %></p><% } %>
+        <button class="more-btn" type="button" data-more-open>Meer over <%= profile.display_name %></button>
+      </div>
+      <div class="swipe-more" data-more hidden>
+        <div class="swipe-more-head">
+          <strong><%= profile.display_name %>, <%= profile.age %></strong>
+          <button class="more-close" type="button" data-more-close aria-label="Sluiten">✕</button>
+        </div>
+        <%- include('partials/profile-details', { p: profile, mine: user.interests }) %>
+      </div>
+      <div class="swipe-hint swipe-hint-left" aria-hidden="true">NEE</div>
+      <div class="swipe-hint swipe-hint-right" aria-hidden="true">JA</div>
+    </article>
+    <div class="swipe-actions">
+      <form method="post" action="/swipe" data-swipe-form="left">
+        <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+        <input type="hidden" name="target_id" value="<%= profile.id %>">
+        <input type="hidden" name="direction" value="left">
+        <button class="round-btn round-no" type="submit" aria-label="Geen interesse (links)">✕</button>
+      </form>
+      <form method="post" action="/swipe" data-swipe-form="right">
+        <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+        <input type="hidden" name="target_id" value="<%= profile.id %>">
+        <input type="hidden" name="direction" value="right">
+        <button class="round-btn round-yes" type="submit" aria-label="Interesse (rechts)">♥</button>
+      </form>
+    </div>
+    <%- include('partials/today-rules') %>
+    <p class="center small"><a class="muted" href="/melden/<%= profile.id %>">Profiel melden of blokkeren</a></p>
+  </section>
+<% } %>
+<%- include('partials/foot') %>

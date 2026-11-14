@@ -1,0 +1,224 @@
+<%- include('../partials/head') %>
+<%
+  const s = plan.status;
+  const showChooser = (s === 'collecting' && (!iSubmitted || changeTimes)) || s === 'no_overlap' || (s === 'proposed' && changeTimes);
+  const chosen = {};
+  for (const c of myChoices) chosen[new Date(c.slot_start).toISOString()] = c.rank;
+  const otherName = other.display_name;
+%>
+<section class="card match-head">
+  <div class="match-person">
+    <% if (other.video_key && plan.match_status === 'active') { %>
+      <video class="thumb-video" src="/media/video/<%= other.id %>" muted loop playsinline autoplay preload="metadata"></video>
+    <% } %>
+    <div>
+      <h1><%= otherName %><% if (other.age) { %>, <%= other.age %><% } %></h1>
+      <%- include('../partials/badges', { u: other }) %>
+      <% if (other.bio) { %><p class="muted"><%= other.bio %></p><% } %>
+    </div>
+  </div>
+  <% if ((other.prompts && other.prompts.length) || (other.interests && other.interests.length) || (other.languages && other.languages.length)) { %>
+    <details class="more-details">
+      <summary>Meer over <%= otherName %></summary>
+      <%- include('../partials/profile-details', { p: Object.assign({}, other, { bio: '' }), mine: user.interests }) %>
+    </details>
+  <% } %>
+  <p class="small muted">Match op <%= plan.day %>. Afspreken kan alleen op deze dag.</p>
+</section>
+
+<% if (['collecting', 'no_overlap', 'proposed'].includes(s)) { %><%- include('../partials/today-rules') %><% } %>
+
+<% if (noShowAgainstMe) { %>
+  <div class="notice notice-error">
+    <strong>Er is een no-show over jou gemeld.</strong> <a href="/no-shows/<%= noShowAgainstMe.id %>">Bekijk de melding en maak eventueel bezwaar</a>.
+  </div>
+<% } %>
+
+<% if (s === 'collecting' && iSubmitted && !changeTimes) { %>
+  <section class="card">
+    <h2>Je tijden staan erin ✅</h2>
+    <p>We wachten tot <%= otherName %> ook kiest. Je hoort het meteen. Swipe intussen lekker verder, wie weet wacht daar nóg een match 😉</p>
+    <ol class="choices"><% for (const c of myChoices) { %><li><%= fmt.time(new Date(c.slot_start)) %></li><% } %></ol>
+    <p><a class="btn btn-primary" href="/ontdekken">Blijf swipen 🔥</a> <a class="btn btn-ghost" href="?wijzig=1">Mijn tijden aanpassen</a></p>
+  </section>
+<% } %>
+
+<% if (s === 'no_overlap') { %>
+  <div class="notice notice-warning">
+    <strong>🙈 Net niet op dezelfde tijd.</strong> Geen paniek, dat gebeurt vaak! Kies hieronder nog een paar andere tijden (hoe meer, hoe beter de kans); <%= otherName %> wordt gevraagd hetzelfde te doen.
+  </div>
+<% } %>
+
+<% if (showChooser) { %>
+  <section class="card">
+    <h2><%= s === 'collecting' && !iSubmitted ? '⏰ Wanneer kun je vandaag?' : 'Kies (andere) tijden' %></h2>
+    <% if (s === 'proposed') { %><p class="notice notice-warning">Als je nieuwe tijden kiest, vervalt het huidige voorstel en moeten jullie allebei opnieuw kiezen.</p><% } %>
+    <% if (!slots.length) { %>
+      <p>Er zijn vandaag geen tijden meer beschikbaar.</p>
+    <% } else { %>
+      <p class="muted">Tik de tijden aan in volgorde van voorkeur (1 = liefst). Maximaal <%= maxTimeChoices %> tijden. Kies je er meer, dan is de kans groter dat het meteen past 🎯 <%= otherSubmitted ? otherName + ' heeft al gekozen!' : '' %></p>
+      <p class="small muted">Vallen jullie tijden net naast elkaar? Dan doet Vandaag zelf een voorstel 💡</p>
+      <form method="post" action="/matches/<%= plan.match_id %>/tijden" class="slots-form" data-slots data-max="<%= maxTimeChoices %>">
+        <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+        <div class="slots">
+          <% for (const slot of slots) { const iso = slot.toISOString(); const r = (s === 'collecting') ? chosen[iso] : undefined; %>
+            <label class="slot" data-slot>
+              <span class="slot-time"><%= fmt.time(slot) %></span>
+              <select name="rank_<%= iso %>" aria-label="Voorkeur voor <%= fmt.time(slot) %>">
+                <option value="">–</option>
+                <% for (let i = 1; i <= maxTimeChoices; i++) { %><option value="<%= i %>" <%= r === i ? 'selected' : '' %>><%= i %></option><% } %>
+              </select>
+            </label>
+          <% } %>
+        </div>
+        <div class="row">
+          <button class="btn btn-primary" type="submit">Tijden opslaan</button>
+          <button class="btn btn-ghost" type="button" data-slots-reset>Wissen</button>
+          <% if (changeTimes) { %><a class="btn btn-ghost" href="/matches/<%= plan.match_id %>">Annuleren</a><% } %>
+        </div>
+      </form>
+    <% } %>
+  </section>
+<% } %>
+
+<% if (s === 'proposed' && !changeTimes) { %>
+  <section class="card proposal">
+    <h2><%= plan.suggested ? '💡 Voorstel van Vandaag' : '✨ Jullie gezamenlijke tijd' %></h2>
+    <% if (plan.suggested) { %>
+      <p class="muted">Jullie tijden vielen net naast elkaar. Dit is de tijd die voor jullie allebei het dichtst bij je wensen ligt.</p>
+    <% } %>
+    <p class="big"><%= fmt.longDate(plan.proposed_start) %> om <strong><%= fmt.time(plan.proposed_start) %></strong></p>
+    <% if (venue) { %>
+      <div class="venue">
+        <strong><%= venue.name %></strong> <span class="tag tag-muted"><%= venue.kind === 'koffie' ? 'koffieplek' : venue.kind %></span><br>
+        <%= venue.street_address %>, <%= venue.postcode %> <%= venue.city %><% if (venue.neighborhood) { %> · <%= venue.neighborhood %><% } %><br>
+        <% if (venue.website) { %><a href="<%= venue.website %>" rel="noopener noreferrer" target="_blank">Website</a><% } %>
+        <p class="muted small">De app maakt geen reservering.</p>
+      </div>
+      <% if (iConfirmed) { %>
+        <div class="notice notice-success">✅ Jij zei ja! <%= otherConfirmed ? '' : 'Zodra ' + otherName + ' ook ja zegt, staat de date. Swipe intussen lekker verder 🔥' %></div>
+        <p class="center"><a class="btn btn-primary" href="/ontdekken">Blijf swipen 🔥</a></p>
+      <% } else { %>
+        <form method="post" action="/matches/<%= plan.match_id %>/bevestigen" class="form">
+          <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+          <input type="hidden" name="proposal_version" value="<%= plan.proposal_version %>">
+          <button class="btn btn-primary btn-lg" type="submit">Ja, past! ✅</button>
+        </form>
+        <% if (otherConfirmed) { %><p class="muted"><%= otherName %> zei al ja 🎉</p><% } %>
+        <% if (plan.suggested) { %>
+          <% if (plan.suggest_count < 2) { %>
+            <form method="post" action="/matches/<%= plan.match_id %>/past-niet" class="form">
+              <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+              <button class="btn btn-ghost" type="submit">Past niet, doe een ander voorstel</button>
+            </form>
+          <% } else { %>
+            <p class="small muted">Past ook dit niet? Dan kies je zelf andere tijden.</p>
+          <% } %>
+        <% } %>
+        <p class="small muted">Met je ja ga je akkoord met de no-showregel (zie hieronder).</p>
+      <% } %>
+    <% } else { %>
+      <div class="notice notice-warning"><strong>Er is nog geen locatie beschikbaar.</strong> Er is (nog) geen bar of koffieplek ingevoerd die op dit tijdstip open is. Zodra die er is, kun je ja zeggen 🍸</div>
+    <% } %>
+    <p><a href="?wijzig=1">Zelf andere tijden kiezen</a></p>
+    <details class="more-details"><summary>No-showregel</summary><%- include('../partials/noshow-terms') %></details>
+  </section>
+<% } %>
+
+<% if (s === 'confirmed') { %>
+  <section class="card proposal confirmed">
+    <h2>🎉 Jullie date staat!</h2>
+    <p class="big"><%= fmt.longDate(plan.proposed_start) %> om <strong><%= fmt.time(plan.proposed_start) %></strong></p>
+    <% if (venue) { %>
+      <div class="venue">
+        <strong><%= venue.name %></strong><br><%= venue.street_address %>, <%= venue.postcode %> <%= venue.city %>
+        <% if (venue.website) { %><br><a href="<%= venue.website %>" rel="noopener noreferrer" target="_blank">Website</a><% } %>
+      </div>
+    <% } %>
+    <p class="muted small">Alles staat vast, je hoeft niets meer te doen. Kan het toch niet? Annuleer gerust hieronder.</p>
+    <details class="more-details"><summary>No-showregel</summary><%- include('../partials/noshow-terms') %></details>
+    <p class="center"><a class="btn btn-primary btn-lg" href="/matches/<%= plan.match_id %>/agenda.ics">📅 Zet in mijn agenda</a></p>
+    <p class="center"><a class="btn btn-primary" href="/ontdekken">Tot die tijd: blijf swipen 🔥</a></p>
+    <% const delays = events.filter(e => e.type === 'delayed'); %>
+    <% if (delays.length) { %>
+      <ul class="events">
+        <% for (const e of delays) { %>
+          <li><%= e.user_id === user.id ? 'Jij' : otherName %>: ongeveer <%= e.payload.minutes %> minuten later (gemeld om <%= fmt.time(new Date(e.created_at)) %>)</li>
+        <% } %>
+      </ul>
+    <% } %>
+  </section>
+
+  <section class="card">
+    <h2>Acties</h2>
+    <div class="actions-grid">
+      <form method="post" action="/matches/<%= plan.match_id %>/vertraagd" class="action-box">
+        <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+        <h3>Ik ben vertraagd</h3>
+        <select name="minutes" aria-label="Aantal minuten">
+          <% for (const m of delayOptions) { %><option value="<%= m %>"><%= m %> minuten</option><% } %>
+        </select>
+        <button class="btn" type="submit">Laat <%= otherName %> het weten</button>
+      </form>
+      <% if (!startPassed) { %>
+        <form method="post" action="/matches/<%= plan.match_id %>/annuleren" class="action-box" data-confirm="Weet je zeker dat je de date wilt annuleren?">
+          <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+          <input type="hidden" name="confirm" value="yes">
+          <h3>Ik wil annuleren</h3>
+          <p class="small muted"><%= otherName %> krijgt een vriendelijke melding dat de date niet doorgaat.</p>
+          <button class="btn btn-ghost" type="submit">Date annuleren</button>
+        </form>
+      <% } %>
+      <div class="action-box unsafe">
+        <h3>Ik voel me niet veilig</h3>
+        <p class="small">Beëindig de date en blokkeer of meld <%= otherName %>.</p>
+        <a class="btn btn-danger" href="/matches/<%= plan.match_id %>/onveilig">Ik voel me niet veilig</a>
+      </div>
+    </div>
+    <p class="small muted">Deze app heeft geen live hulpdienst. Ben je in acuut gevaar? Bel <strong>112</strong>.</p>
+  </section>
+
+  <section class="card">
+    <h2>No-show</h2>
+    <% if (myNoShowReport) { %>
+      <p>Je hebt een no-show gemeld. <a href="/no-shows/<%= myNoShowReport.id %>">Bekijk de status</a>.</p>
+    <% } else if (canReportNoShow) { %>
+      <form method="post" action="/matches/<%= plan.match_id %>/no-show" data-confirm="Weet je zeker dat <%= otherName %> niet is gekomen? Je match kan bezwaar maken.">
+        <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+        <p><%= otherName %> is niet gekomen? Meld het hier.</p>
+        <button class="btn" type="submit">Meld no-show</button>
+      </form>
+    <% } else { %>
+      <p class="muted">Is <%= otherName %> niet gekomen? Een no-show melden kan vanaf <%= fmt.time(noShowOpensAt) %> (<%= noShowDelay %> minuten na de starttijd).</p>
+    <% } %>
+  </section>
+<% } %>
+
+<% if (['cancelled', 'ended_unsafe', 'expired'].includes(s)) { %>
+  <section class="card">
+    <% if (s === 'cancelled') { %>
+      <h2>😕 Deze date gaat niet door</h2>
+      <p><%= plan.closed_by === user.id ? 'Je hebt de date geannuleerd.' : 'Helaas, je date heeft geannuleerd.' %> Maar niet getreurd: er komt snel een nieuwe match jouw kant op! 💫</p>
+      <p><a class="btn btn-primary" href="/ontdekken">Blijf swipen 🔥</a></p>
+    <% } else if (s === 'ended_unsafe') { %>
+      <h2>Beëindigd</h2>
+      <p><%= plan.closed_by === user.id ? 'Je hebt deze date beëindigd.' : 'Deze date is beëindigd.' %> Pas goed op jezelf 💛 Er wacht vast iemand leuks.</p>
+      <p><a class="btn btn-primary" href="/ontdekken">Blijf swipen 🔥</a></p>
+    <% } else { %>
+      <h2>⌛ Helaas, verlopen</h2>
+      <p>De dag is voorbij of de voorgestelde tijd verstreken. Dat kan gebeuren! Afspreken kan alleen op de dag van de match. Dus swipe verder, de volgende match ligt al te wachten 💫</p>
+      <p><a class="btn btn-primary" href="/ontdekken">Blijf swipen 🔥</a></p>
+    <% } %>
+  </section>
+<% } %>
+
+<% if (plan.match_status === 'active') { %>
+  <div class="small center">
+    <a class="muted" href="/melden/<%= other.id %>">Melden</a> ·
+    <form method="post" action="/blokkeren/<%= other.id %>" class="inline" data-confirm="<%= otherName %> blokkeren? Een geplande date wordt geannuleerd.">
+      <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+      <button class="link muted" type="submit">Blokkeren</button>
+    </form>
+  </div>
+<% } %>
+<%- include('../partials/foot') %>

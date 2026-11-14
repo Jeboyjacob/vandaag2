@@ -1,0 +1,21 @@
+<%- include('partials/head') %>
+<section class="card narrow center intro">
+  <div class="intro-emoji" aria-hidden="true"><%= slide.emoji %></div>
+  <h1><%= slide.title %></h1>
+  <ul class="intro-lines">
+    <% for (const l of slide.lines) { %><li><%= l %></li><% } %>
+  </ul>
+  <div class="intro-dots" aria-label="Stap <%= n %> van <%= total %>">
+    <% for (let i = 1; i <= total; i++) { %><span class="<%= i === n ? 'on' : '' %>"></span><% } %>
+  </div>
+  <% if (n < total) { %>
+    <p><a class="btn btn-primary btn-lg" href="/uitleg/<%= n + 1 %>">Volgende</a></p>
+    <p><form method="post" action="/uitleg/klaar" class="inline"><input type="hidden" name="_csrf" value="<%= csrfToken %>"><button class="link muted small" type="submit">Overslaan</button></form></p>
+  <% } else { %>
+    <form method="post" action="/uitleg/klaar">
+      <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+      <button class="btn btn-primary btn-lg" type="submit">Aan de slag 🔥</button>
+    </form>
+  <% } %>
+</section>
+<%- include('partials/foot') %>

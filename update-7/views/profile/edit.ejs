@@ -1,0 +1,92 @@
+<%- include('../partials/head') %>
+<section class="card">
+  <div class="row-between">
+    <h1>Mijn profiel</h1>
+    <%- include('../partials/badges', { u: user }) %>
+  </div>
+  <% if (!user.readiness.ready) { %><p class="notice notice-info">Je profiel is nog niet zichtbaar voor anderen. <a href="/start">Bekijk wat er nog nodig is</a>.</p><% } %>
+
+  <h2>Video</h2>
+  <p class="muted">Je video is het belangrijkste deel van je profiel. Toegestaan: mp4, mov of webm, maximaal 100 MB (ongeveer 30 seconden).</p>
+  <% if (user.video_key) { %>
+    <video class="profile-video" src="/media/video/<%= user.id %>" controls playsinline preload="metadata"></video>
+    <form method="post" action="/profiel/video/verwijderen" class="inline" data-confirm="Video verwijderen? Zonder video ben je niet zichtbaar.">
+      <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+      <button class="btn btn-ghost" type="submit">Video verwijderen</button>
+    </form>
+  <% } else { %>
+    <div class="video-placeholder">Nog geen video</div>
+  <% } %>
+  <form method="post" action="/profiel/video" enctype="multipart/form-data" class="form upload-form">
+    <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+    <label><%= user.video_key ? 'Nieuwe video uploaden' : 'Video uploaden' %>
+      <input type="file" name="video" accept="video/*" required>
+    </label>
+    <progress class="upload-progress" max="100" value="0" hidden></progress>
+    <button class="btn btn-primary" type="submit">Uploaden</button>
+  </form>
+
+  <h2>Gegevens</h2>
+  <% if (errors.length) { %><div class="notice notice-error"><ul><% for (const e of errors) { %><li><%= e %></li><% } %></ul></div><% } %>
+  <p class="notice notice-info">💘 Zoek je iets specifieks? Stel je <a href="/voorkeuren">date-voorkeuren</a> in: wie je wilt zien, leeftijd en afstand.</p>
+  <form method="post" action="/profiel" class="form">
+    <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+    <label>Naam <input type="text" name="display_name" maxlength="40" required value="<%= user.display_name %>"></label>
+    <p class="field-static">Leeftijd: <strong><%= age %></strong> <span class="muted">(zelf opgegeven via je geboortedatum, niet geverifieerd<%= user.age_verification_status === 'verified' ? ' — inmiddels wel geverifieerd' : '' %>)</span></p>
+    <label>Over mij <textarea name="bio" maxlength="300" rows="3"><%= user.bio %></textarea><small>Maximaal 300 tekens.</small></label>
+
+    <fieldset class="prompts">
+      <legend>Leer me kennen</legend>
+      <small>Kies tot <%= opts.PROMPT_SLOTS %> vragen en geef er een antwoord op. Dit maakt je profiel persoonlijker en geeft een ander iets om op te reageren.</small>
+      <% promptValues.forEach(function (pv, i) { %>
+        <div class="prompt-slot">
+          <select name="prompt_key_<%= i %>" aria-label="Vraag <%= i + 1 %>">
+            <option value="">— Kies een vraag —</option>
+            <% for (const q of opts.PROMPTS) { %><option value="<%= q.key %>" <%= pv.key === q.key ? 'selected' : '' %>><%= q.text %></option><% } %>
+          </select>
+          <textarea name="prompt_answer_<%= i %>" maxlength="<%= opts.PROMPT_MAX_LEN %>" rows="2" placeholder="Je antwoord (max. <%= opts.PROMPT_MAX_LEN %> tekens)" aria-label="Antwoord <%= i + 1 %>"><%= pv.answer %></textarea>
+        </div>
+      <% }) %>
+    </fieldset>
+
+    <fieldset>
+      <legend>Interesses</legend>
+      <small>Tik aan wat bij je past (maximaal <%= opts.MAX_INTERESTS %>).</small>
+      <% const myInterests = user.interests || []; %>
+      <% for (const g of opts.INTEREST_GROUPS) { %>
+        <p class="chip-title"><%= g.title %></p>
+        <div class="chips">
+          <% for (const it of g.items) { %>
+            <label class="chip"><input type="checkbox" name="interests" value="<%= it.key %>" data-max-group="interests" <%= myInterests.includes(it.key) ? 'checked' : '' %>><span><%= it.label %></span></label>
+          <% } %>
+        </div>
+      <% } %>
+    </fieldset>
+
+    <fieldset>
+      <legend>Talen die ik spreek</legend>
+      <small>Kies maximaal <%= opts.MAX_LANGUAGES %>.</small>
+      <% const myLangs = user.languages || []; %>
+      <div class="chips">
+        <% for (const l of opts.LANGUAGES) { %>
+          <label class="chip"><input type="checkbox" name="languages" value="<%= l.key %>" data-max-group="languages" <%= myLangs.includes(l.key) ? 'checked' : '' %>><span><%= l.label %></span></label>
+        <% } %>
+      </div>
+    </fieldset>
+
+    <fieldset>
+      <legend>Ik ben</legend>
+      <label class="check"><input type="radio" name="gender" value="" <%= !user.gender ? 'checked' : '' %>> <span>Zeg ik liever niet</span></label>
+      <% for (const g of genders) { %>
+        <label class="check"><input type="radio" name="gender" value="<%= g %>" <%= user.gender === g ? 'checked' : '' %>> <span><%= g %></span></label>
+      <% } %>
+      <small>Kies je niets, dan zie je alleen mensen die geen gendervoorkeur hebben ingesteld, en zien zij jou.</small>
+    </fieldset>
+
+    <button class="btn btn-primary" type="submit">Opslaan</button>
+  </form>
+
+  <h2>Account</h2>
+  <p><a href="/verificatie">Verificatie</a> · <a href="/geblokkeerd">Geblokkeerde personen</a> · <a class="danger-link" href="/account/verwijderen">Account verwijderen</a></p>
+</section>
+<%- include('../partials/foot') %>

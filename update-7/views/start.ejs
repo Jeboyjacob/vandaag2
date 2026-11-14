@@ -1,0 +1,21 @@
+<%- include('partials/head') %>
+<section class="card narrow">
+  <h1>Bijna klaar, <%= user.display_name %> 🎉</h1>
+  <p>Nog een paar kleine stappen en dan kun je swipen en word je gezien door anderen 💫</p>
+  <ol class="checklist">
+    <li class="<%= user.livenessOk ? 'done' : '' %>">
+      <strong>Gezichtscheck</strong>
+      <% if (user.liveness_status === 'passed') { %> — geslaagd.
+      <% } else if (user.liveness_status === 'dev_bypass') { %> — overgeslagen in ontwikkelmodus (<em>niet geverifieerd</em>).
+      <% } else { %> — nog niet gedaan. <a href="/verificatie">Naar verificatie</a><% } %>
+    </li>
+    <li class="<%= user.video_key ? 'done' : '' %>">
+      <strong>Profielvideo</strong>
+      <% if (user.video_key) { %> — geüpload.<% } else { %> — nog niet geüpload. <a href="/profiel">Video uploaden</a><% } %>
+    </li>
+    <% if (user.profile_hidden) { %>
+      <li><strong>Profiel verborgen</strong> — je profiel is door de beheerder verborgen na een melding.</li>
+    <% } %>
+  </ol>
+</section>
+<%- include('partials/foot') %>

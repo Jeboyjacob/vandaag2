@@ -1,0 +1,21 @@
+<%- include('partials/head') %>
+<section class="hero">
+  <div class="stickers" aria-hidden="true"><span class="sticker">☕</span><span class="sticker">🍸</span><span class="sticker">💘</span><span class="sticker">✨</span></div>
+  <h1>Match <mark>vandaag</mark>.<br><span class="hl">Date</span> <mark>vandaag</mark>.</h1>
+  <p class="lead">Bekijk profielvideo’s van singles (18+) in Amsterdam. Als jullie allebei naar rechts swipen, kiezen jullie een tijd en stellen wij één bar of koffieplek voor. Geen eindeloos chatten.</p>
+  <% if (registrationOpen) { %>
+    <p><a class="btn btn-primary btn-lg" href="/registreren">Account maken</a> <a class="btn btn-ghost btn-lg" href="/inloggen">Inloggen</a></p>
+  <% } else { %>
+    <div class="notice notice-warning">
+      <strong>Registratie is nog gesloten.</strong>
+      De verplichte gezichtscheck (controle dat je live voor de camera staat) is nog niet beschikbaar. Zodra die gekoppeld is, kun je een account maken.
+    </div>
+    <p><a class="btn btn-ghost" href="/inloggen">Inloggen met een bestaand account</a></p>
+  <% } %>
+</section>
+<section class="steps">
+  <div class="step"><span>1</span><h3>Video bekijken</h3><p>Eén profiel tegelijk. Links is geen interesse, rechts wel.</p></div>
+  <div class="step"><span>2</span><h3>Tijden kiezen</h3><p>Na een match kiezen jullie allebei je tijden voor vandaag. Je ja blijft staan tot morgenochtend.</p></div>
+  <div class="step"><span>3</span><h3>Date staat</h3><p>Dezelfde tijd gekozen? Dan staat je date meteen, met één bar of koffieplek. Anders doen wij een voorstel.</p></div>
+</section>
+<%- include('partials/foot') %>
